@@ -1,0 +1,94 @@
+import { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '@/store/useAuthStore';
+
+export default function Login() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const { login, loading, error, clearError } = useAuthStore();
+  const navigate = useNavigate();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await login(email, password);
+      navigate('/');
+    } catch {
+      // error is set in store
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-ink flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gold font-display tracking-wide">
+            AlphaPath
+          </h1>
+          <p className="text-text-secondary mt-2 text-sm">基金经理成长管理系统</p>
+        </div>
+
+        {/* Card */}
+        <div className="card p-8">
+          <h2 className="text-xl font-semibold text-text-primary mb-6 font-display">
+            登录
+          </h2>
+
+          {error && (
+            <div className="mb-4 p-3 bg-urgent/10 border border-urgent/20 rounded-lg text-urgent text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm text-text-secondary mb-1.5">邮箱</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  clearError();
+                }}
+                className="w-full px-4 py-2.5 bg-[#0F1419] border border-[#2A3040] rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-gold transition-colors"
+                placeholder="your@email.com"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-text-secondary mb-1.5">密码</label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  clearError();
+                }}
+                className="w-full px-4 py-2.5 bg-[#0F1419] border border-[#2A3040] rounded-lg text-text-primary placeholder-text-muted focus:outline-none focus:border-gold transition-colors"
+                placeholder="输入密码"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full btn-gold py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? '登录中...' : '登录'}
+            </button>
+          </form>
+
+          <p className="mt-6 text-center text-sm text-text-secondary">
+            还没有账号？{' '}
+            <Link to="/register" className="text-gold hover:text-gold-light transition-colors">
+              注册
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}

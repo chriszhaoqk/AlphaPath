@@ -1,0 +1,11 @@
+{
+  "name": "alphapath-api",
+  "version": "1.0.0",
+  "description": "AlphaPath Backend API",
+  "main": "api/server.ts",
+  "type": "module",
+  "scripts": {
+    "start": "tsx api/server.ts",
+    "dev": "nodemon"
+  }
+}
