@@ -113,6 +113,41 @@ export default function IndustryPage() {
     setForm(emptyForm);
   };
 
+  const handleSaveWithStatus = async (status: 'draft' | 'published') => {
+    if (!form.title || !form.industry) return;
+    if (status === 'published' && !form.keyFindings) return;
+    if (editingId) {
+      await updateResearch(editingId, {
+        title: form.title,
+        industry: form.industry,
+        subIndustry: form.subIndustry || undefined,
+        date: form.date,
+        participants: form.participants || undefined,
+        summary: form.summary,
+        keyFindings: form.keyFindings,
+        investmentImplications: form.investmentImplications,
+        status,
+        tags: form.tags,
+      });
+    } else {
+      await addResearch({
+        title: form.title,
+        industry: form.industry,
+        subIndustry: form.subIndustry || undefined,
+        date: form.date,
+        participants: form.participants || undefined,
+        summary: form.summary,
+        keyFindings: form.keyFindings,
+        investmentImplications: form.investmentImplications,
+        status,
+        tags: form.tags,
+      });
+    }
+    setActiveTab('list');
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
   const handleDelete = async (id: string) => {
     await deleteResearch(id);
     if (expandedId === id) setExpandedId(null);
@@ -493,35 +528,6 @@ export default function IndustryPage() {
             </div>
           </div>
 
-          {/* Status */}
-          <div>
-            <label className="block text-xs text-text-secondary mb-1.5">状态</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setForm({ ...form, status: 'draft' })}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                  form.status === 'draft'
-                    ? 'bg-gold/20 text-gold border-gold/30'
-                    : 'border-border-custom bg-ink text-text-secondary hover:border-gold/20'
-                }`}
-              >
-                <Circle size={16} />
-                草稿
-              </button>
-              <button
-                onClick={() => setForm({ ...form, status: 'published' })}
-                className={`flex items-center justify-center gap-2 py-2.5 rounded-lg border text-sm font-medium transition-all ${
-                  form.status === 'published'
-                    ? 'bg-positive/20 text-positive border-positive/30'
-                    : 'border-border-custom bg-ink text-text-secondary hover:border-positive/20'
-                }`}
-              >
-                <CheckCircle2 size={16} />
-                已发布
-              </button>
-            </div>
-          </div>
-
           {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
@@ -531,11 +537,18 @@ export default function IndustryPage() {
               取消
             </button>
             <button
-              onClick={handleSave}
+              onClick={() => { setForm({ ...form, status: 'draft' }); handleSaveWithStatus('draft'); }}
+              disabled={!form.title || !form.industry}
+              className="flex-1 py-2.5 text-sm border border-gold/30 text-gold bg-gold/10 hover:bg-gold/20 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              保存草稿
+            </button>
+            <button
+              onClick={() => handleSaveWithStatus('published')}
               disabled={!form.title || !form.industry || !form.keyFindings}
               className="flex-1 btn-gold py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {editingId ? '保存修改' : '保存纪要'}
+              发布纪要
             </button>
           </div>
         </div>
