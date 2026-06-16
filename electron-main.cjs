@@ -1,6 +1,7 @@
-const { app, BrowserWindow, dialog, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const path = require('path');
 const https = require('https');
+const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 
@@ -27,25 +28,19 @@ function createWindow() {
   }
 }
 
-// ============ Custom Update Checker (China-friendly) ============
+// ============ Hybrid Update: Custom check + electron-updater install ============
 const CURRENT_VERSION = app.getVersion();
 const GITHUB_OWNER = 'chriszhaoqk';
 const GITHUB_REPO = 'AlphaPath';
 
-// Download proxies for China (only for file downloads)
 const DOWNLOAD_PROXIES = [
   'https://ghfast.top/',
   'https://gh-proxy.com/',
   'https://ghproxy.cc/',
 ];
 
-// API endpoints that work in China (tried in order)
-const API_ENDPOINTS = [
-  // GitHub API mirror that works in China
-  `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-  // Fallback: parse the release page HTML
-  `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-];
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = true;
 
 function httpGet(url, timeout = 15000) {
   return new Promise((resolve, reject) => {
@@ -56,7 +51,6 @@ function httpGet(url, timeout = 15000) {
     const lib = url.startsWith('https') ? require('https') : require('http');
     lib.get(url, { headers: { 'User-Agent': 'AlphaPath-Updater' } }, (res) => {
       clearTimeout(timer);
-      // Follow redirects
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         return httpGet(res.headers.location, timeout).then(resolve).catch(reject);
       }
@@ -75,53 +69,26 @@ function httpGet(url, timeout = 15000) {
 }
 
 async function fetchLatestVersion() {
-  // Method 1: Try GitHub API directly (works if user has VPN)
+  // Method 1: GitHub API directly
   try {
-    const data = await httpGet(API_ENDPOINTS[0], 10000);
+    const data = await httpGet(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`, 10000);
     const release = JSON.parse(data);
     if (release.tag_name) {
-      return {
-        version: release.tag_name.replace(/^v/, ''),
-        releaseUrl: release.html_url,
-        assets: release.assets || [],
-      };
+      return release.tag_name.replace(/^v/, '');
     }
   } catch (err) {
     console.log('GitHub API failed:', err.message);
   }
 
-  // Method 2: Parse release page HTML to extract version
+  // Method 2: Parse release page HTML
   try {
-    const html = await httpGet(API_ENDPOINTS[1], 10000);
-    // Extract version from title or tag
+    const html = await httpGet(`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`, 10000);
     const tagMatch = html.match(/\/releases\/tag\/v?([\d.]+)/);
     if (tagMatch) {
-      return {
-        version: tagMatch[1],
-        releaseUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
-        assets: [],
-      };
+      return tagMatch[1];
     }
   } catch (err) {
     console.log('GitHub HTML parse failed:', err.message);
-  }
-
-  // Method 3: Try through download proxy to access the API
-  for (const proxy of DOWNLOAD_PROXIES) {
-    try {
-      const proxyUrl = proxy + API_ENDPOINTS[0];
-      const data = await httpGet(proxyUrl, 10000);
-      const release = JSON.parse(data);
-      if (release.tag_name) {
-        return {
-          version: release.tag_name.replace(/^v/, ''),
-          releaseUrl: release.html_url,
-          assets: release.assets || [],
-        };
-      }
-    } catch (err) {
-      console.log(`Proxy ${proxy} failed:`, err.message);
-    }
   }
 
   throw new Error('无法连接更新服务器，请检查网络连接');
@@ -139,50 +106,102 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
-function getPlatformInfo() {
-  const platform = process.platform;
-  const arch = process.arch;
-  if (platform === 'darwin') {
-    return { ext: '.dmg', archSuffix: arch === 'arm64' ? '-arm64' : '' };
-  } else if (platform === 'win32') {
-    return { ext: '.exe', archSuffix: '' };
-  } else {
-    return { ext: '.AppImage', archSuffix: '' };
-  }
-}
+// Set electron-updater feed URL through proxy
+function setProxiedFeedURL(version) {
+  const baseUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/`;
 
-function getDownloadUrl(release) {
-  const { ext, archSuffix } = getPlatformInfo();
-
-  // If we have assets from API, find the matching one
-  if (release.assets && release.assets.length > 0) {
-    const asset = release.assets.find(a =>
-      a.name.endsWith(ext) && !a.name.includes('.blockmap') && a.name.includes(archSuffix)
-    ) || release.assets.find(a =>
-      a.name.endsWith(ext) && !a.name.includes('.blockmap')
-    );
-
-    if (asset) {
-      const originalUrl = asset.browser_download_url;
-      // Return first working proxy URL
-      for (const proxy of DOWNLOAD_PROXIES) {
-        return proxy + originalUrl;
-      }
-      return originalUrl;
+  // Try each proxy
+  for (const proxy of DOWNLOAD_PROXIES) {
+    const proxyUrl = proxy + baseUrl;
+    try {
+      autoUpdater.setFeedURL({
+        provider: 'generic',
+        url: proxyUrl,
+      });
+      console.log('Set feed URL:', proxyUrl);
+      return true;
+    } catch (err) {
+      console.log(`Proxy ${proxy} failed:`, err.message);
     }
   }
 
-  // Fallback: construct download URL from version
-  const version = release.version;
-  const { ext: fallbackExt, archSuffix: fallbackArch } = getPlatformInfo();
-  const filename = `AlphaPath-${version}${fallbackArch}${fallbackExt}`;
-  const originalUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/${filename}`;
-
-  for (const proxy of DOWNLOAD_PROXIES) {
-    return proxy + originalUrl;
+  // Fallback: direct GitHub
+  try {
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: GITHUB_OWNER,
+      repo: GITHUB_REPO,
+    });
+    console.log('Using direct GitHub feed');
+    return true;
+  } catch (err) {
+    console.log('Direct GitHub also failed:', err.message);
+    return false;
   }
-  return originalUrl;
 }
+
+// electron-updater events
+autoUpdater.on('update-available', (info) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-status', { type: 'available', version: info.version });
+  }
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: '发现新版本',
+    message: `AlphaPath v${info.version} 已发布，是否立即下载更新？`,
+    detail: '更新将在后台下载，下载完成后提示您重启安装。',
+    buttons: ['立即更新', '稍后提醒'],
+    defaultId: 0,
+    cancelId: 1,
+  }).then(({ response }) => {
+    if (response === 0) {
+      autoUpdater.downloadUpdate();
+    }
+  });
+});
+
+autoUpdater.on('download-progress', (progress) => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setProgressBar(progress.percent / 100);
+    mainWindow.webContents.send('update-status', {
+      type: 'progress',
+      percent: Math.round(progress.percent),
+    });
+  }
+});
+
+autoUpdater.on('update-downloaded', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.setProgressBar(-1);
+    mainWindow.webContents.send('update-status', { type: 'downloaded' });
+  }
+  dialog.showMessageBox(mainWindow, {
+    type: 'info',
+    title: '更新已就绪',
+    message: '新版本已下载完成，重启应用即可完成更新。',
+    detail: '点击"立即重启"将关闭应用并安装更新。',
+    buttons: ['立即重启', '稍后安装'],
+    defaultId: 0,
+    cancelId: 1,
+  }).then(({ response }) => {
+    if (response === 0) {
+      autoUpdater.quitAndInstall();
+    }
+  });
+});
+
+autoUpdater.on('update-not-available', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-status', { type: 'not-available', version: CURRENT_VERSION });
+  }
+});
+
+autoUpdater.on('error', (err) => {
+  console.error('Auto-updater error:', err.message);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('update-status', { type: 'error', message: err.message });
+  }
+});
 
 async function checkForUpdates() {
   try {
@@ -190,9 +209,8 @@ async function checkForUpdates() {
       mainWindow.webContents.send('update-status', { type: 'checking' });
     }
 
-    const release = await fetchLatestVersion();
-    const latestVersion = release.version;
-
+    // Step 1: Custom check to get latest version (works in China)
+    const latestVersion = await fetchLatestVersion();
     console.log(`Current: ${CURRENT_VERSION}, Latest: ${latestVersion}`);
 
     if (compareVersions(latestVersion, CURRENT_VERSION) <= 0) {
@@ -208,26 +226,11 @@ async function checkForUpdates() {
       return;
     }
 
-    // New version available
-    const downloadUrl = getDownloadUrl(release);
+    // Step 2: New version found - set proxy feed URL and let electron-updater handle it
+    setProxiedFeedURL(latestVersion);
 
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-status', { type: 'available', version: latestVersion, downloadUrl });
-    }
-
-    const { response } = await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: '发现新版本',
-      message: `AlphaPath v${latestVersion} 已发布！`,
-      detail: `当前版本: v${CURRENT_VERSION}\n最新版本: v${latestVersion}\n\n点击"前往下载"将在浏览器中打开加速下载链接。`,
-      buttons: ['前往下载', '稍后提醒'],
-      defaultId: 0,
-      cancelId: 1,
-    });
-
-    if (response === 0) {
-      shell.openExternal(downloadUrl || release.releaseUrl);
-    }
+    // Step 3: Let electron-updater check and download
+    await autoUpdater.checkForUpdates();
   } catch (err) {
     console.error('Update check error:', err.message);
     if (mainWindow && !mainWindow.isDestroyed()) {
