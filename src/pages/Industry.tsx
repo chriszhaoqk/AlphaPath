@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo } from 'react';
-import { FileText, Plus, PenLine, Trash2, X, ChevronRight, ChevronDown, CheckCircle2, Circle, Tag } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
+import { FileText, Plus, PenLine, Trash2, X, ChevronRight, ChevronDown, CheckCircle2, Circle, Tag, Maximize2 } from 'lucide-react';
 import { useIndustryStore, type IndustryResearch } from '@/store/useIndustryStore';
 
 type ViewTab = 'list' | 'write';
@@ -44,6 +44,28 @@ export default function IndustryPage() {
   const [filterIndustry, setFilterIndustry] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [newTag, setNewTag] = useState('');
+
+  // Fullscreen editor state
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorField, setEditorField] = useState<keyof Pick<ResearchFormData, 'summary' | 'keyFindings' | 'investmentImplications'>>('summary');
+  const [editorValue, setEditorValue] = useState('');
+
+  const openEditor = useCallback((field: keyof Pick<ResearchFormData, 'summary' | 'keyFindings' | 'investmentImplications'>) => {
+    setEditorField(field);
+    setEditorValue(form[field]);
+    setEditorOpen(true);
+  }, [form]);
+
+  const saveEditor = useCallback(() => {
+    setForm(prev => ({ ...prev, [editorField]: editorValue }));
+    setEditorOpen(false);
+  }, [editorField, editorValue]);
+
+  const FIELD_LABELS: Record<string, string> = {
+    summary: '会议摘要',
+    keyFindings: '核心发现',
+    investmentImplications: '投资启示',
+  };
 
   useEffect(() => {
     fetchResearches();
@@ -460,7 +482,17 @@ export default function IndustryPage() {
 
           {/* Summary */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1.5">会议摘要</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-text-secondary">会议摘要</label>
+              <button
+                type="button"
+                onClick={() => openEditor('summary')}
+                className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors"
+              >
+                <Maximize2 size={12} />
+                展开
+              </button>
+            </div>
             <textarea
               value={form.summary}
               onChange={(e) => setForm({ ...form, summary: e.target.value })}
@@ -472,7 +504,17 @@ export default function IndustryPage() {
 
           {/* Key findings */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1.5">核心发现 *</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-text-secondary">核心发现 *</label>
+              <button
+                type="button"
+                onClick={() => openEditor('keyFindings')}
+                className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors"
+              >
+                <Maximize2 size={12} />
+                展开
+              </button>
+            </div>
             <textarea
               value={form.keyFindings}
               onChange={(e) => setForm({ ...form, keyFindings: e.target.value })}
@@ -484,7 +526,17 @@ export default function IndustryPage() {
 
           {/* Investment implications */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1.5">投资启示</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-text-secondary">投资启示</label>
+              <button
+                type="button"
+                onClick={() => openEditor('investmentImplications')}
+                className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors"
+              >
+                <Maximize2 size={12} />
+                展开
+              </button>
+            </div>
             <textarea
               value={form.investmentImplications}
               onChange={(e) => setForm({ ...form, investmentImplications: e.target.value })}
@@ -550,6 +602,45 @@ export default function IndustryPage() {
             >
               发布纪要
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Editor Modal */}
+      {editorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-[90vw] max-w-4xl h-[80vh] bg-ink border border-border-custom rounded-xl flex flex-col shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-border-custom">
+              <h3 className="text-base font-semibold text-text-primary font-display">
+                {FIELD_LABELS[editorField]}
+              </h3>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-text-muted">
+                  {editorValue.length} 字
+                </span>
+                <button
+                  onClick={saveEditor}
+                  className="btn-gold text-sm px-4 py-1.5"
+                >
+                  完成
+                </button>
+                <button
+                  onClick={() => setEditorOpen(false)}
+                  className="p-1 text-text-muted hover:text-text-primary transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            {/* Editor */}
+            <textarea
+              autoFocus
+              value={editorValue}
+              onChange={(e) => setEditorValue(e.target.value)}
+              className="flex-1 w-full bg-transparent px-5 py-4 text-sm text-text-primary leading-relaxed focus:outline-none resize-none"
+              placeholder={`输入${FIELD_LABELS[editorField]}内容...`}
+            />
           </div>
         </div>
       )}
