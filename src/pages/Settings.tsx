@@ -1,41 +1,103 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Cloud, CloudOff, Download, Save, RotateCcw, LogOut, Info, RefreshCw } from 'lucide-react';
-
-interface VersionSnapshot {
-  id: string;
-  date: string;
-  description: string;
-}
+import { useSyncStore } from '@/store/useSyncStore';
+import {
+  Cloud,
+  CloudOff,
+  CloudUpload,
+  CloudDownload,
+  RefreshCw,
+  Download,
+  Upload,
+  LogOut,
+  Info,
+  Copy,
+  Check,
+  AlertCircle,
+  FileJson,
+  Trash2,
+} from 'lucide-react';
 
 export default function Settings() {
   const { user, logout } = useAuthStore();
+  const syncStore = useSyncStore();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Data Management
-  const [cloudSync, setCloudSync] = useState(true);
-  const [lastSyncTime, setLastSyncTime] = useState<string>('2025-06-15 10:30');
-  const [syncing, setSyncing] = useState(false);
-
-  // Version History
-  const [snapshots, setSnapshots] = useState<VersionSnapshot[]>([
-    { id: '1', date: '2025-06-10', description: '初始数据导入' },
-    { id: '2', date: '2025-06-12', description: '技能评估更新' },
-  ]);
-  const [newSnapshotDesc, setNewSnapshotDesc] = useState('');
-
-  // Change Password
-  const [oldPassword, setOldPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [passwordMsg, setPasswordMsg] = useState('');
+  const [tokenInput, setTokenInput] = useState('');
+  const [showToken, setShowToken] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   // Update check
-  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'>('idle');
+  const [updateStatus, setUpdateStatus] = useState<
+    'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'
+  >('idle');
   const [updateVersion, setUpdateVersion] = useState('');
   const [updateProgress, setUpdateProgress] = useState(0);
   const [updateError, setUpdateError] = useState('');
 
-  useEffect(() => {
+  const {
+    githubToken,
+    gistId,
+    lastSyncTime,
+    syncStatus,
+    syncMessage,
+    autoSync,
+    setGithubToken,
+    setGistId,
+    setAutoSync,
+    clearCredentials,
+    uploadToCloud,
+    downloadFromCloud,
+    sync,
+    exportToJson,
+    importFromJson,
+  } = syncStore;
+
+  const handleSaveToken = () => {
+    if (tokenInput.trim()) {
+      setGithubToken(tokenInput.trim());
+      setTokenInput('');
+    }
+  };
+
+  const handleExport = () => {
+    const json = exportToJson();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `alphapath-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const content = event.target?.result as string;
+      importFromJson(content);
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
+  const handleCopyToken = () => {
+    if (githubToken) {
+      navigator.clipboard.writeText(githubToken);
+      setTokenCopied(true);
+      setTimeout(() => setTokenCopied(false), 2000);
+    }
+  };
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus('checking');
+    setUpdateError('');
     const electronAPI = (window as any).electronAPI;
     if (electronAPI?.onUpdateStatus) {
       electronAPI.onUpdateStatus((data: any) => {
@@ -61,12 +123,6 @@ export default function Settings() {
         }
       });
     }
-  }, []);
-
-  const handleCheckUpdate = async () => {
-    setUpdateStatus('checking');
-    setUpdateError('');
-    const electronAPI = (window as any).electronAPI;
     if (electronAPI?.checkForUpdates) {
       await electronAPI.checkForUpdates();
     } else {
@@ -75,256 +131,264 @@ export default function Settings() {
     }
   };
 
-  const handleSync = () => {
-    setSyncing(true);
-    setTimeout(() => {
-      setLastSyncTime(new Date().toLocaleString('zh-CN'));
-      setSyncing(false);
-    }, 1500);
-  };
-
-  const handleExport = () => {
-    const data = {
-      user,
-      exportedAt: new Date().toISOString(),
-      version: '1.0.0',
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `alphapath-export-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const handleCreateSnapshot = () => {
-    if (!newSnapshotDesc.trim()) return;
-    const snapshot: VersionSnapshot = {
-      id: Date.now().toString(),
-      date: new Date().toLocaleDateString('zh-CN'),
-      description: newSnapshotDesc.trim(),
-    };
-    setSnapshots((prev) => [snapshot, ...prev]);
-    setNewSnapshotDesc('');
-  };
-
-  const handleRestore = (snapshot: VersionSnapshot) => {
-    if (window.confirm(`确定恢复到「${snapshot.description}」版本？当前数据将被覆盖。`)) {
-      // Restore logic would go here
-    }
-  };
-
-  const handleChangePassword = () => {
-    setPasswordMsg('');
-    if (!oldPassword || !newPassword || !confirmPassword) {
-      setPasswordMsg('请填写所有密码字段');
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPasswordMsg('新密码与确认密码不一致');
-      return;
-    }
-    if (newPassword.length < 6) {
-      setPasswordMsg('新密码至少6位');
-      return;
-    }
-    // Password change API call would go here
-    setPasswordMsg('密码修改成功');
-    setOldPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
+  const formatTime = (iso: string | null) => {
+    if (!iso) return '从未同步';
+    const d = new Date(iso);
+    return d.toLocaleString('zh-CN');
   };
 
   return (
-    <div className="animate-fade-in-up space-y-4 md:space-y-6">
+    <div className="space-y-5">
       <h1 className="text-2xl font-bold text-text-primary font-display">设置</h1>
 
-      {/* Data Management */}
+      {/* Cloud Sync - 云端同步 */}
       <section>
-        <h2 className="text-lg font-bold text-text-primary font-display mb-3">数据管理</h2>
-        <div className="card p-4 md:p-5 space-y-3 md:space-y-4">
-          {/* Cloud Sync Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {cloudSync ? (
-                <Cloud size={20} className="text-positive" />
-              ) : (
-                <CloudOff size={20} className="text-text-muted" />
-              )}
-              <div>
-                <p className="text-sm text-text-primary">云端同步</p>
-                <p className="text-xs text-text-muted">自动同步数据到云端</p>
+        <h2 className="text-base font-semibold text-text-primary mb-3 flex items-center gap-2">
+          <Cloud size={18} className="text-gold" />
+          云端同步
+        </h2>
+
+        <div className="card p-4 md:p-5 space-y-4">
+          {/* Status summary */}
+          <div className="flex items-start justify-between p-3 bg-[#0D1117] rounded-xl border border-border-custom">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                {syncStatus === 'success' && (
+                  <Check size={14} className="text-positive flex-shrink-0" />
+                )}
+                {syncStatus === 'error' && (
+                  <AlertCircle size={14} className="text-urgent flex-shrink-0" />
+                )}
+                {(syncStatus === 'idle' || syncStatus === 'syncing') && (
+                  <Cloud size={14} className="text-gold flex-shrink-0" />
+                )}
+                <span className="text-sm text-text-primary font-medium">
+                  {syncStatus === 'success'
+                    ? '同步正常'
+                    : syncStatus === 'error'
+                      ? '同步异常'
+                      : syncStatus === 'syncing'
+                        ? '同步中...'
+                        : '待同步'}
+                </span>
               </div>
+              {syncMessage && (
+                <p
+                  className={`text-xs ${
+                    syncStatus === 'error' ? 'text-urgent' : 'text-text-muted'
+                  }`}
+                >
+                  {syncMessage}
+                </p>
+              )}
+              <p className="text-xs text-text-muted mt-1">
+                最后同步时间: {formatTime(lastSyncTime)}
+              </p>
+              {gistId && (
+                <p className="text-xs text-text-muted mt-0.5">
+                  存储位置: GitHub Gist ({gistId.slice(0, 8)}...)
+                </p>
+              )}
             </div>
-            <button
-              onClick={() => setCloudSync(!cloudSync)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${
-                cloudSync ? 'bg-positive' : 'bg-border-custom'
-              }`}
-            >
-              <span
-                className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
-                  cloudSync ? 'translate-x-5.5 left-0.5' : 'left-0.5'
+            <div className="flex items-center gap-1.5 ml-3 flex-shrink-0">
+              <button
+                onClick={() => setAutoSync(!autoSync)}
+                className={`text-xs px-2 py-1.5 rounded-lg transition-colors ${
+                  autoSync ? 'bg-gold/15 text-gold' : 'bg-[#1A1F2E] text-text-muted'
                 }`}
-                style={{ transform: cloudSync ? 'translateX(22px)' : 'translateX(0)' }}
-              />
+              >
+                自动: {autoSync ? '开' : '关'}
+              </button>
+            </div>
+          </div>
+
+          {/* Sync actions */}
+          <div className="grid grid-cols-3 gap-2">
+            <button
+              onClick={downloadFromCloud}
+              disabled={syncStatus === 'syncing'}
+              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-[#1A1F2E] active:bg-[#242938] transition-colors disabled:opacity-50"
+            >
+              <CloudDownload size={20} className="text-gold" />
+              <span className="text-xs text-text-primary">拉取</span>
+            </button>
+            <button
+              onClick={sync}
+              disabled={syncStatus === 'syncing'}
+              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-gold/15 active:bg-gold/25 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw size={20} className={`text-gold ${syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+              <span className="text-xs text-gold font-medium">智能同步</span>
+            </button>
+            <button
+              onClick={uploadToCloud}
+              disabled={syncStatus === 'syncing'}
+              className="flex flex-col items-center gap-1.5 py-3 px-2 rounded-xl bg-[#1A1F2E] active:bg-[#242938] transition-colors disabled:opacity-50"
+            >
+              <CloudUpload size={20} className="text-gold" />
+              <span className="text-xs text-text-primary">上传</span>
             </button>
           </div>
 
-          {/* Manual Sync */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-text-primary">手动同步</p>
-              <p className="text-xs text-text-muted">
-                最后同步: {lastSyncTime}
+          {/* GitHub Token configuration */}
+          <div className="pt-3 border-t border-border-custom">
+            <label className="block text-xs text-text-secondary mb-2">
+              GitHub Personal Token
+              <span className="text-text-muted ml-1">（用于云端存储）</span>
+            </label>
+
+            {githubToken ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-muted overflow-hidden">
+                    {showToken
+                      ? githubToken
+                      : '••••••••••••' + githubToken.slice(-8)}
+                  </div>
+                  <button
+                    onClick={() => setShowToken(!showToken)}
+                    className="flex items-center gap-1 px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E]"
+                  >
+                    {showToken ? '隐藏' : '显示'}
+                  </button>
+                  <button
+                    onClick={handleCopyToken}
+                    className="flex items-center gap-1 px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E]"
+                  >
+                    {tokenCopied ? <Check size={12} className="text-positive" /> : <Copy size={12} />}
+                  </button>
+                  <button
+                    onClick={clearCredentials}
+                    className="flex items-center gap-1 px-3 py-2 text-xs border border-urgent/30 rounded-lg text-urgent active:bg-urgent/10"
+                  >
+                    <Trash2 size={12} />
+                    清除
+                  </button>
+                </div>
+                <p className="text-xs text-text-muted">
+                  Token 已保存，仅存储在本地设备。
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={tokenInput}
+                    onChange={(e) => setTokenInput(e.target.value)}
+                    placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+                    className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold/50"
+                  />
+                  <button
+                    onClick={handleSaveToken}
+                    disabled={!tokenInput.trim()}
+                    className="btn-gold text-sm px-4 disabled:opacity-40"
+                  >
+                    保存
+                  </button>
+                </div>
+                <details className="text-xs text-text-muted">
+                  <summary className="cursor-pointer hover:text-gold">如何获取 GitHub Token？</summary>
+                  <div className="mt-2 p-3 bg-ink rounded-lg space-y-1.5 leading-relaxed">
+                    <p>1. 打开 github.com → Settings → Developer settings → Personal access tokens</p>
+                    <p>2. 点击 Generate new token → Generate new token (classic)</p>
+                    <p>3. 勾选 <span className="text-gold">gist</span> 权限（只勾选这一个即可）</p>
+                    <p>4. 点击 Generate token，复制 token（形如 ghp_xxx）粘贴到上方</p>
+                  </div>
+                </details>
+              </div>
+            )}
+          </div>
+
+          {/* Gist ID display */}
+          {gistId && (
+            <div className="pt-2">
+              <label className="block text-xs text-text-secondary mb-1.5">同步 ID</label>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-1.5 text-xs text-text-muted truncate">
+                  {gistId}
+                </code>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(gistId);
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E]"
+                >
+                  <Copy size={12} />
+                  复制
+                </button>
+              </div>
+              <p className="text-xs text-text-muted mt-1.5">
+                在其他设备上安装 AlphaPath 后，使用相同的 Token 并在此输入 ID 即可同步。
               </p>
             </div>
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="btn-gold text-sm px-3 py-1.5 md:px-4"
-            >
-              {syncing ? '同步中...' : '立即同步'}
-            </button>
-          </div>
+          )}
+        </div>
+      </section>
 
-          {/* Export Data */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-text-primary">导出数据</p>
-              <p className="text-xs text-text-muted">下载所有用户数据的JSON文件</p>
+      {/* Backup & Restore - 数据备份 */}
+      <section>
+        <h2 className="text-base font-semibold text-text-primary mb-3 flex items-center gap-2">
+          <FileJson size={18} className="text-gold" />
+          本地备份
+        </h2>
+        <div className="card p-4 md:p-5 space-y-3">
+          <div className="flex items-start justify-between">
+            <div className="flex-1 min-w-0 pr-3">
+              <p className="text-sm text-text-primary">导出数据到文件</p>
+              <p className="text-xs text-text-muted">将所有数据保存为 JSON 文件，可用于备份或跨设备迁移</p>
             </div>
-            <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 md:px-4 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary hover:border-gold/50 transition-colors">
-              <Download size={16} />
+            <button
+              onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E] flex-shrink-0"
+            >
+              <Download size={14} />
               导出
             </button>
           </div>
 
-          {/* Create Snapshot */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-text-primary">创建版本快照</p>
-              <p className="text-xs text-text-muted">保存当前数据状态</p>
+          <div className="flex items-start justify-between pt-3 border-t border-border-custom">
+            <div className="flex-1 min-w-0 pr-3">
+              <p className="text-sm text-text-primary">从文件导入数据</p>
+              <p className="text-xs text-text-muted">从 JSON 文件恢复数据，将与本地数据智能合并</p>
             </div>
             <button
-              onClick={() => {
-                if (newSnapshotDesc.trim()) {
-                  handleCreateSnapshot();
-                }
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 md:px-4 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary hover:border-gold/50 transition-colors"
+              onClick={handleImportClick}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E] flex-shrink-0"
             >
-              <Save size={16} />
-              创建快照
+              <Upload size={14} />
+              导入
             </button>
-          </div>
-        </div>
-      </section>
-
-      {/* Version History */}
-      <section>
-        <h2 className="text-lg font-bold text-text-primary font-display mb-3">版本历史</h2>
-        <div className="card p-4 md:p-5 space-y-3 md:space-y-4">
-          {/* Create new version */}
-          <div className="flex gap-2">
             <input
-              type="text"
-              value={newSnapshotDesc}
-              onChange={(e) => setNewSnapshotDesc(e.target.value)}
-              placeholder="输入版本描述..."
-              className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold/50"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleCreateSnapshot();
-              }}
+              ref={fileInputRef}
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={handleFileImport}
             />
-            <button onClick={handleCreateSnapshot} className="btn-gold text-sm px-3 md:px-4">
-              创建
-            </button>
-          </div>
-
-          {/* Snapshot list */}
-          <div className="space-y-2">
-            {snapshots.map((snapshot) => (
-              <div key={snapshot.id} className="flex items-center justify-between py-2 border-b border-border-custom last:border-0">
-                <div>
-                  <p className="text-sm text-text-primary">{snapshot.description}</p>
-                  <p className="text-xs text-text-muted">{snapshot.date}</p>
-                </div>
-                <button
-                  onClick={() => handleRestore(snapshot)}
-                  className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors"
-                >
-                  <RotateCcw size={12} />
-                  恢复
-                </button>
-              </div>
-            ))}
           </div>
         </div>
       </section>
 
       {/* Account */}
       <section>
-        <h2 className="text-lg font-bold text-text-primary font-display mb-3">账户</h2>
-        <div className="card p-4 md:p-5 space-y-3 md:space-y-4">
-          {/* User info */}
+        <h2 className="text-base font-semibold text-text-primary mb-3">账户</h2>
+        <div className="card p-4 md:p-5 space-y-3">
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-secondary">邮箱</span>
-              <span className="text-sm text-text-primary">{user?.email || '-'}</span>
+              <span className="text-sm text-text-primary">{user?.email || 'guest@alphapath'}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-secondary">姓名</span>
-              <span className="text-sm text-text-primary">{user?.name || '-'}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-text-secondary">注册日期</span>
-              <span className="text-sm text-text-primary">-</span>
+              <span className="text-sm text-text-primary">{user?.name || '访客'}</span>
             </div>
           </div>
 
-          {/* Change Password */}
-          <div className="pt-4 border-t border-border-custom">
-            <h3 className="text-sm font-semibold text-text-primary mb-3">修改密码</h3>
-            <div className="space-y-3">
-              <input
-                type="password"
-                value={oldPassword}
-                onChange={(e) => setOldPassword(e.target.value)}
-                placeholder="当前密码"
-                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold/50"
-              />
-              <input
-                type="password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="新密码"
-                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold/50"
-              />
-              <input
-                type="password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="确认新密码"
-                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold/50"
-              />
-              {passwordMsg && (
-                <p className={`text-xs ${passwordMsg.includes('成功') ? 'text-positive' : 'text-urgent'}`}>
-                  {passwordMsg}
-                </p>
-              )}
-              <button onClick={handleChangePassword} className="btn-gold text-sm">
-                修改密码
-              </button>
-            </div>
-          </div>
-
-          {/* Logout */}
-          <div className="pt-4 border-t border-border-custom">
+          <div className="pt-3 border-t border-border-custom">
             <button
               onClick={logout}
-              className="flex items-center gap-2 px-4 py-2.5 text-sm bg-urgent/10 text-urgent rounded-lg hover:bg-urgent/20 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm bg-urgent/10 text-urgent rounded-lg active:bg-urgent/20 transition-colors"
             >
               <LogOut size={16} />
               退出登录
@@ -335,18 +399,17 @@ export default function Settings() {
 
       {/* About */}
       <section>
-        <h2 className="text-lg font-bold text-text-primary font-display mb-3">关于</h2>
+        <h2 className="text-base font-semibold text-text-primary mb-3">关于</h2>
         <div className="card p-4 md:p-5">
           <div className="flex items-center gap-3 mb-3">
-            <Info size={20} className="text-gold" />
+            <Info size={18} className="text-gold" />
             <div>
               <p className="text-sm font-semibold text-text-primary">AlphaPath</p>
-              <p className="text-xs text-text-muted">版本 1.0.3</p>
+              <p className="text-xs text-text-muted">版本 1.3.0</p>
             </div>
           </div>
-          <p className="text-sm text-text-secondary mb-4">基金经理成长管理系统</p>
+          <p className="text-sm text-text-secondary mb-3">基金经理成长管理系统</p>
 
-          {/* Check for updates */}
           <div className="pt-3 border-t border-border-custom">
             <div className="flex items-center justify-between">
               <div>
@@ -373,9 +436,9 @@ export default function Settings() {
               <button
                 onClick={handleCheckUpdate}
                 disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
-                className="flex items-center gap-1.5 px-3 py-1.5 md:px-4 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary hover:border-gold/50 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E] disabled:opacity-50"
               >
-                <RefreshCw size={16} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
+                <RefreshCw size={14} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
                 检查更新
               </button>
             </div>
