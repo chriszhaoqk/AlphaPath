@@ -14,6 +14,7 @@ import {
   LogOut,
   Wifi,
   WifiOff,
+  Building2,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -22,6 +23,7 @@ const navItems = [
   { to: '/roadmap', icon: Target, label: '目标路线图' },
   { to: '/schedule', icon: Calendar, label: '日程管理' },
   { to: '/tasks', icon: CheckSquare, label: '任务中心' },
+  { to: '/industry', icon: Building2, label: '产业调研' },
   { to: '/learning', icon: BookOpen, label: '学习追踪' },
   { to: '/journal', icon: PenLine, label: '投资日记' },
   { to: '/skills', icon: Radar, label: '技能雷达' },
