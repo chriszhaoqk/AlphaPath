@@ -32,24 +32,33 @@ const CURRENT_VERSION = app.getVersion();
 const GITHUB_OWNER = 'chriszhaoqk';
 const GITHUB_REPO = 'AlphaPath';
 
-// Proxy URLs for China (tried in order)
-const API_PROXIES = [
+// Download proxies for China (only for file downloads)
+const DOWNLOAD_PROXIES = [
   'https://ghfast.top/',
-  'https://mirror.ghproxy.com/',
-  '',
+  'https://gh-proxy.com/',
+  'https://ghproxy.cc/',
 ];
 
-function httpGet(url) {
+// API endpoints that work in China (tried in order)
+const API_ENDPOINTS = [
+  // GitHub API mirror that works in China
+  `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+  // Fallback: parse the release page HTML
+  `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+];
+
+function httpGet(url, timeout = 15000) {
   return new Promise((resolve, reject) => {
-    const timeout = 15000;
     const timer = setTimeout(() => {
-      reject(new Error(`Request timeout: ${url}`));
+      reject(new Error(`Timeout: ${url}`));
     }, timeout);
 
-    https.get(url, { headers: { 'User-Agent': 'AlphaPath-Updater' } }, (res) => {
+    const lib = url.startsWith('https') ? require('https') : require('http');
+    lib.get(url, { headers: { 'User-Agent': 'AlphaPath-Updater' } }, (res) => {
       clearTimeout(timer);
+      // Follow redirects
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return httpGet(res.headers.location).then(resolve).catch(reject);
+        return httpGet(res.headers.location, timeout).then(resolve).catch(reject);
       }
       if (res.statusCode !== 200) {
         res.resume();
@@ -65,23 +74,57 @@ function httpGet(url) {
   });
 }
 
-async function fetchLatestRelease() {
-  const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`;
-  const errors = [];
+async function fetchLatestVersion() {
+  // Method 1: Try GitHub API directly (works if user has VPN)
+  try {
+    const data = await httpGet(API_ENDPOINTS[0], 10000);
+    const release = JSON.parse(data);
+    if (release.tag_name) {
+      return {
+        version: release.tag_name.replace(/^v/, ''),
+        releaseUrl: release.html_url,
+        assets: release.assets || [],
+      };
+    }
+  } catch (err) {
+    console.log('GitHub API failed:', err.message);
+  }
 
-  for (const proxy of API_PROXIES) {
-    const url = proxy + apiUrl;
+  // Method 2: Parse release page HTML to extract version
+  try {
+    const html = await httpGet(API_ENDPOINTS[1], 10000);
+    // Extract version from title or tag
+    const tagMatch = html.match(/\/releases\/tag\/v?([\d.]+)/);
+    if (tagMatch) {
+      return {
+        version: tagMatch[1],
+        releaseUrl: `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`,
+        assets: [],
+      };
+    }
+  } catch (err) {
+    console.log('GitHub HTML parse failed:', err.message);
+  }
+
+  // Method 3: Try through download proxy to access the API
+  for (const proxy of DOWNLOAD_PROXIES) {
     try {
-      console.log('Trying update URL:', url);
-      const data = await httpGet(url);
+      const proxyUrl = proxy + API_ENDPOINTS[0];
+      const data = await httpGet(proxyUrl, 10000);
       const release = JSON.parse(data);
-      return release;
+      if (release.tag_name) {
+        return {
+          version: release.tag_name.replace(/^v/, ''),
+          releaseUrl: release.html_url,
+          assets: release.assets || [],
+        };
+      }
     } catch (err) {
-      console.log(`Proxy ${proxy || 'direct'} failed:`, err.message);
-      errors.push(err.message);
+      console.log(`Proxy ${proxy} failed:`, err.message);
     }
   }
-  throw new Error('All update sources failed: ' + errors.join('; '));
+
+  throw new Error('无法连接更新服务器，请检查网络连接');
 }
 
 function compareVersions(v1, v2) {
@@ -96,29 +139,47 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
-function getPlatformAssetName() {
+function getPlatformInfo() {
   const platform = process.platform;
   const arch = process.arch;
   if (platform === 'darwin') {
-    return arch === 'arm64' ? '.dmg' : '.dmg';
+    return { ext: '.dmg', archSuffix: arch === 'arm64' ? '-arm64' : '' };
   } else if (platform === 'win32') {
-    return '.exe';
+    return { ext: '.exe', archSuffix: '' };
   } else {
-    return '.AppImage';
+    return { ext: '.AppImage', archSuffix: '' };
   }
 }
 
 function getDownloadUrl(release) {
-  const ext = getPlatformAssetName();
-  const asset = release.assets.find(a => a.name.endsWith(ext) && !a.name.includes('.blockmap'));
-  if (!asset) return null;
+  const { ext, archSuffix } = getPlatformInfo();
 
-  // Try proxy download URLs
-  const originalUrl = asset.browser_download_url;
-  for (const proxy of API_PROXIES) {
-    if (proxy) {
-      return proxy + originalUrl;
+  // If we have assets from API, find the matching one
+  if (release.assets && release.assets.length > 0) {
+    const asset = release.assets.find(a =>
+      a.name.endsWith(ext) && !a.name.includes('.blockmap') && a.name.includes(archSuffix)
+    ) || release.assets.find(a =>
+      a.name.endsWith(ext) && !a.name.includes('.blockmap')
+    );
+
+    if (asset) {
+      const originalUrl = asset.browser_download_url;
+      // Return first working proxy URL
+      for (const proxy of DOWNLOAD_PROXIES) {
+        return proxy + originalUrl;
+      }
+      return originalUrl;
     }
+  }
+
+  // Fallback: construct download URL from version
+  const version = release.version;
+  const { ext: fallbackExt, archSuffix: fallbackArch } = getPlatformInfo();
+  const filename = `AlphaPath-${version}${fallbackArch}${fallbackExt}`;
+  const originalUrl = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/download/v${version}/${filename}`;
+
+  for (const proxy of DOWNLOAD_PROXIES) {
+    return proxy + originalUrl;
   }
   return originalUrl;
 }
@@ -129,8 +190,8 @@ async function checkForUpdates() {
       mainWindow.webContents.send('update-status', { type: 'checking' });
     }
 
-    const release = await fetchLatestRelease();
-    const latestVersion = release.tag_name.replace(/^v/, '');
+    const release = await fetchLatestVersion();
+    const latestVersion = release.version;
 
     console.log(`Current: ${CURRENT_VERSION}, Latest: ${latestVersion}`);
 
@@ -149,26 +210,23 @@ async function checkForUpdates() {
 
     // New version available
     const downloadUrl = getDownloadUrl(release);
-    const releaseUrl = release.html_url;
 
     if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('update-status', { type: 'available', version: latestVersion, downloadUrl, releaseUrl });
+      mainWindow.webContents.send('update-status', { type: 'available', version: latestVersion, downloadUrl });
     }
 
     const { response } = await dialog.showMessageBox(mainWindow, {
       type: 'info',
       title: '发现新版本',
       message: `AlphaPath v${latestVersion} 已发布！`,
-      detail: `当前版本: v${CURRENT_VERSION}\n最新版本: v${latestVersion}\n\n点击"前往下载"将打开下载页面。`,
+      detail: `当前版本: v${CURRENT_VERSION}\n最新版本: v${latestVersion}\n\n点击"前往下载"将在浏览器中打开加速下载链接。`,
       buttons: ['前往下载', '稍后提醒'],
       defaultId: 0,
       cancelId: 1,
     });
 
     if (response === 0) {
-      // Open download page in browser (proxy link if available)
-      const url = downloadUrl || releaseUrl;
-      shell.openExternal(url);
+      shell.openExternal(downloadUrl || release.releaseUrl);
     }
   } catch (err) {
     console.error('Update check error:', err.message);
