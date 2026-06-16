@@ -464,8 +464,8 @@ export default function IndustryPage() {
             <textarea
               value={form.summary}
               onChange={(e) => setForm({ ...form, summary: e.target.value })}
-              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-none"
-              rows={3}
+              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-y min-h-[80px]"
+              rows={5}
               placeholder="记录会议的主要内容和背景..."
             />
           </div>
@@ -476,8 +476,8 @@ export default function IndustryPage() {
             <textarea
               value={form.keyFindings}
               onChange={(e) => setForm({ ...form, keyFindings: e.target.value })}
-              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-none"
-              rows={4}
+              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-y min-h-[100px]"
+              rows={6}
               placeholder="记录调研中的关键发现和数据..."
             />
           </div>
@@ -488,8 +488,8 @@ export default function IndustryPage() {
             <textarea
               value={form.investmentImplications}
               onChange={(e) => setForm({ ...form, investmentImplications: e.target.value })}
-              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-none"
-              rows={3}
+              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-y min-h-[80px]"
+              rows={5}
               placeholder="分析调研结果对投资决策的影响..."
             />
           </div>
