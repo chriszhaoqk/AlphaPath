@@ -60,6 +60,7 @@ jobs:
 
       - name: Get version
         id: version
+        shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -141,6 +142,7 @@ jobs:
 
       - name: Get version
         id: version
+        shell: bash
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
