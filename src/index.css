@@ -4,6 +4,55 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Rich text editor styles */
+.prose-sm p {
+  margin-bottom: 0.5em;
+  text-indent: 0;
+}
+.prose-sm p[style*="text-indent"] {
+  text-indent: inherit;
+}
+.prose-sm h2 {
+  font-size: 1.25em;
+  font-weight: 700;
+  margin: 0.8em 0 0.4em;
+}
+.prose-sm h3 {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 0.6em 0 0.3em;
+}
+.prose-sm h4 {
+  font-size: 1em;
+  font-weight: 600;
+  margin: 0.5em 0 0.3em;
+}
+.prose-sm ul {
+  list-style: disc;
+  padding-left: 1.5em;
+  margin: 0.3em 0;
+}
+.prose-sm li {
+  margin-bottom: 0.2em;
+}
+.prose-sm blockquote {
+  border-left: 3px solid #C5A55A;
+  padding-left: 1em;
+  margin: 0.5em 0;
+  color: #9CA3AF;
+  font-style: italic;
+}
+.prose-sm b, .prose-sm strong {
+  font-weight: 700;
+  color: #E5E7EB;
+}
+.prose-sm i, .prose-sm em {
+  font-style: italic;
+}
+.prose-sm u {
+  text-decoration: underline;
+}
+
 :root {
   --bg-primary: #0F1419;
   --bg-card: #1A1F2E;
