@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import tsconfigPaths from "vite-tsconfig-paths";
 import { traeBadgePlugin } from 'vite-plugin-trae-solo-badge';
 import { VitePWA } from 'vite-plugin-pwa';
+import path from 'path';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -103,5 +104,10 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-  }
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
 })
