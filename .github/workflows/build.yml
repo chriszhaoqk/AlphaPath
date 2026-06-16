@@ -102,14 +102,17 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Publish release after all builds complete
   publish-release:
     needs: [build-android, build-desktop]
     runs-on: ubuntu-latest
     steps:
-      - name: Get version from package.json
+      - uses: actions/checkout@v4
+
+      - name: Get version
         id: version
-        run: echo "version=$(curl -s -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' 'https://api.github.com/repos/${{ github.repository }}/contents/package.json' | python3 -c 'import sys,json,base64; print(json.loads(base64.b64decode(json.load(sys.stdin)["content"]).decode())["version"])')" >> $GITHUB_OUTPUT
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
