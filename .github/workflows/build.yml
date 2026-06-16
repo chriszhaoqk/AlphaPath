@@ -42,11 +42,17 @@ jobs:
         working-directory: android
         run: ./gradlew assembleDebug
 
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Upload APK to Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ github.run_number }}
-          name: AlphaPath v${{ github.run_number }}
+          tag_name: v${{ steps.version.outputs.version }}
+          name: AlphaPath v${{ steps.version.outputs.version }}
           files: android/app/build/outputs/apk/debug/app-debug.apk
           draft: false
           prerelease: false
@@ -101,24 +107,3 @@ jobs:
         run: npx electron-builder --linux --config electron-builder.json --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  publish-release:
-    needs: [build-android, build-desktop]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Get version
-        id: version
-        run: |
-          VERSION=$(node -p "require('./package.json').version")
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Publish Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
