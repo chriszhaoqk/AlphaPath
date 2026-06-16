@@ -1,8 +1,5 @@
-import { app, BrowserWindow } from 'electron';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const { app, BrowserWindow } = require('electron');
+const path = require('path');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -16,10 +13,18 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
     },
-    icon: path.join(__dirname, 'dist', 'pwa-512x512.png'),
   });
 
-  win.loadFile(path.join(__dirname, 'dist', 'index.html'));
+  // In packaged app, resources are inside app.asar
+  // __dirname points to the app's root where electron-main.js lives
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  console.log('Loading file from:', indexPath);
+  win.loadFile(indexPath);
+
+  // Open DevTools in development
+  if (process.env.NODE_ENV === 'development') {
+    win.webContents.openDevTools();
+  }
 }
 
 app.whenReady().then(createWindow);
