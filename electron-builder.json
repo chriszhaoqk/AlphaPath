@@ -11,6 +11,11 @@
   "buildDependenciesFromSource": false,
   "nodeGypRebuild": false,
   "npmRebuild": false,
+  "publish": {
+    "provider": "github",
+    "owner": "chriszhaoqk",
+    "repo": "AlphaPath"
+  },
   "mac": {
     "target": ["dmg"],
     "icon": "dist/pwa-512x512.png",
