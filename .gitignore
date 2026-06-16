@@ -24,8 +24,8 @@ dist-ssr
 *.sw?
 .vite
 
-# Database
-data/
+# Database (root level only)
+/data/
 *.db
 
 # Environment
