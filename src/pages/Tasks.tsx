@@ -8,7 +8,9 @@ import {
   ChevronUp,
   CheckCircle2,
   Circle,
+  Maximize2,
 } from 'lucide-react';
+import FullscreenEditor from '@/components/FullscreenEditor';
 import { useTaskStore, type Quadrant, type TagType } from '@/store/useTaskStore';
 import TaskItem from '@/components/TaskItem';
 import {
@@ -91,6 +93,8 @@ export default function Tasks() {
   const [quadrantFilter, setQuadrantFilter] = useState<Quadrant | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<AddTaskForm>({ ...emptyForm });
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorValue, setEditorValue] = useState('');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     daily: true,
     weekly: false,
@@ -176,6 +180,11 @@ export default function Tasks() {
 
   const toggleChecklist = (key: string) => {
     setChecklistState((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const openEditor = () => {
+    setEditorValue(form.description);
+    setEditorOpen(true);
   };
 
   return (
@@ -441,7 +450,13 @@ export default function Tasks() {
 
               {/* Description */}
               <div>
-                <label className="block text-xs text-text-secondary mb-1.5">描述</label>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs text-text-secondary mb-1.5">描述</label>
+                  <button type="button" onClick={openEditor} className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors">
+                    <Maximize2 size={12} />
+                    展开
+                  </button>
+                </div>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
@@ -540,6 +555,18 @@ export default function Tasks() {
             </div>
           </div>
         </div>
+      )}
+      {editorOpen && (
+        <FullscreenEditor
+          label="任务描述"
+          value={editorValue}
+          onSave={(val) => {
+            setEditorValue(val);
+            setForm(prev => ({ ...prev, description: val }));
+            setEditorOpen(false);
+          }}
+          onClose={() => setEditorOpen(false)}
+        />
       )}
     </div>
   );

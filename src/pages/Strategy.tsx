@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useStrategyStore, type Strategy } from '@/store/useStrategyStore';
-import { TrendingUp, TrendingDown, Minus, Save, X, Edit3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Save, X, Edit3, Maximize2 } from 'lucide-react';
+import FullscreenEditor from '@/components/FullscreenEditor';
 
 interface StrategyTemplate {
   type: 'bull' | 'bear' | 'range';
@@ -97,6 +98,9 @@ function StrategyCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [editValues, setEditValues] = useState<Record<string, string>>({});
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorField, setEditorField] = useState<string>('');
+  const [editorValue, setEditorValue] = useState('');
 
   const handleStartEdit = () => {
     const values: Record<string, string> = {};
@@ -120,6 +124,12 @@ function StrategyCard({
 
   const getValue = (key: keyof Strategy, defaultValue: string) => {
     return (strategy?.[key] as string) || defaultValue;
+  };
+
+  const openEditor = (key: string) => {
+    setEditorField(key);
+    setEditorValue(editValues[key] || '');
+    setEditorOpen(true);
   };
 
   return (
@@ -150,18 +160,38 @@ function StrategyCard({
           <div key={key}>
             <span className="text-xs text-text-muted">{label}</span>
             {editing ? (
-              <textarea
-                value={editValues[key] || ''}
-                onChange={(e) => setEditValues((prev) => ({ ...prev, [key]: e.target.value }))}
-                rows={2}
-                className="w-full mt-1 bg-ink border border-border-custom rounded px-2 py-1 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-none"
-              />
+              <div className="mt-1">
+                <div className="flex items-center justify-end mb-1">
+                  <button type="button" onClick={() => openEditor(key)} className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors">
+                    <Maximize2 size={11} />
+                    展开
+                  </button>
+                </div>
+                <textarea
+                  value={editValues[key] || ''}
+                  onChange={(e) => setEditValues((prev) => ({ ...prev, [key]: e.target.value }))}
+                  rows={2}
+                  className="w-full bg-ink border border-border-custom rounded px-2 py-1 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-none"
+                />
+              </div>
             ) : (
-              <p className="text-sm text-text-primary mt-0.5">{getValue(key, defaultValue)}</p>
+              <div className="text-sm text-text-primary mt-0.5 prose-sm" dangerouslySetInnerHTML={{ __html: getValue(key, defaultValue) }} />
             )}
           </div>
         ))}
       </div>
+      {editorOpen && (
+        <FullscreenEditor
+          label={template.fields.find(f => f.key === editorField)?.label || '编辑'}
+          value={editorValue}
+          onSave={(val) => {
+            setEditorValue(val);
+            setEditValues(prev => ({ ...prev, [editorField]: val }));
+            setEditorOpen(false);
+          }}
+          onClose={() => setEditorOpen(false)}
+        />
+      )}
     </div>
   );
 }

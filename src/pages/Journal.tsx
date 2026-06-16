@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
-import { TrendingUp, Minus, TrendingDown, ChevronDown, ChevronRight, PenLine, Trash2, X, AlertCircle } from 'lucide-react';
+import { TrendingUp, Minus, TrendingDown, ChevronDown, ChevronRight, PenLine, Trash2, X, AlertCircle, Maximize2 } from 'lucide-react';
 import { useJournalStore, type Journal } from '@/store/useJournalStore';
+import FullscreenEditor from '@/components/FullscreenEditor';
 
 type Mood = 'bullish' | 'neutral' | 'bearish';
 type ViewTab = 'list' | 'write';
@@ -35,6 +36,22 @@ export default function JournalPage() {
   const [form, setForm] = useState<JournalFormData>(emptyForm);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
+
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorField, setEditorField] = useState<keyof Pick<JournalFormData, 'market_view' | 'decisions' | 'reflections'>>('market_view');
+  const [editorValue, setEditorValue] = useState('');
+
+  const openEditor = (field: keyof Pick<JournalFormData, 'market_view' | 'decisions' | 'reflections'>) => {
+    setEditorField(field);
+    setEditorValue(form[field]);
+    setEditorOpen(true);
+  };
+
+  const FIELD_LABELS: Record<string, string> = {
+    market_view: '市场观点',
+    decisions: '交易决策',
+    reflections: '反思与总结',
+  };
 
   useEffect(() => {
     fetchJournals();
@@ -237,19 +254,19 @@ export default function JournalPage() {
                       {journal.market_view && (
                         <div>
                           <p className="text-xs text-text-muted mb-1">市场观点</p>
-                          <p className="text-sm text-text-primary whitespace-pre-wrap">{journal.market_view}</p>
+                          <div className="text-sm text-text-primary prose-sm" dangerouslySetInnerHTML={{ __html: journal.market_view }} />
                         </div>
                       )}
                       {journal.decisions && (
                         <div>
                           <p className="text-xs text-text-muted mb-1">交易决策</p>
-                          <p className="text-sm text-text-primary whitespace-pre-wrap">{journal.decisions}</p>
+                          <div className="text-sm text-text-primary prose-sm" dangerouslySetInnerHTML={{ __html: journal.decisions }} />
                         </div>
                       )}
                       {journal.reflections && (
                         <div>
                           <p className="text-xs text-text-muted mb-1">反思与总结</p>
-                          <p className="text-sm text-text-primary whitespace-pre-wrap">{journal.reflections}</p>
+                          <div className="text-sm text-text-primary prose-sm" dangerouslySetInnerHTML={{ __html: journal.reflections }} />
                         </div>
                       )}
                       <div className="flex items-center gap-2 pt-2">
@@ -378,7 +395,13 @@ export default function JournalPage() {
 
           {/* Market view */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1.5">市场观点</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-text-secondary">市场观点</label>
+              <button type="button" onClick={() => openEditor('market_view')} className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors">
+                <Maximize2 size={12} />
+                展开
+              </button>
+            </div>
             <textarea
               value={form.market_view}
               onChange={(e) => setForm({ ...form, market_view: e.target.value })}
@@ -390,7 +413,13 @@ export default function JournalPage() {
 
           {/* Decisions */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1.5">交易决策</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-text-secondary">交易决策</label>
+              <button type="button" onClick={() => openEditor('decisions')} className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors">
+                <Maximize2 size={12} />
+                展开
+              </button>
+            </div>
             <textarea
               value={form.decisions}
               onChange={(e) => setForm({ ...form, decisions: e.target.value })}
@@ -402,7 +431,13 @@ export default function JournalPage() {
 
           {/* Reflections */}
           <div>
-            <label className="block text-xs text-text-secondary mb-1.5">反思与总结</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs text-text-secondary">反思与总结</label>
+              <button type="button" onClick={() => openEditor('reflections')} className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors">
+                <Maximize2 size={12} />
+                展开
+              </button>
+            </div>
             <textarea
               value={form.reflections}
               onChange={(e) => setForm({ ...form, reflections: e.target.value })}
@@ -421,6 +456,19 @@ export default function JournalPage() {
             保存
           </button>
         </div>
+      )}
+
+      {editorOpen && (
+        <FullscreenEditor
+          label={FIELD_LABELS[editorField]}
+          value={editorValue}
+          onSave={(val) => {
+            setEditorValue(val);
+            setForm(prev => ({ ...prev, [editorField]: val }));
+            setEditorOpen(false);
+          }}
+          onClose={() => setEditorOpen(false)}
+        />
       )}
     </div>
   );
