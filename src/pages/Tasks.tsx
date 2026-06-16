@@ -179,22 +179,22 @@ export default function Tasks() {
   };
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-4 md:space-y-6">
       {/* Statistics bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="card p-4 text-center">
+        <div className="card p-3 md:p-4 text-center">
           <p className="text-xs text-text-secondary mb-1">总任务数</p>
           <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
         </div>
-        <div className="card p-4 text-center">
+        <div className="card p-3 md:p-4 text-center">
           <p className="text-xs text-text-secondary mb-1">待办</p>
           <p className="text-2xl font-bold text-warning">{stats.pending}</p>
         </div>
-        <div className="card p-4 text-center">
+        <div className="card p-3 md:p-4 text-center">
           <p className="text-xs text-text-secondary mb-1">已完成</p>
           <p className="text-2xl font-bold text-positive">{stats.completed}</p>
         </div>
-        <div className="card p-4 text-center">
+        <div className="card p-3 md:p-4 text-center">
           <p className="text-xs text-text-secondary mb-1">完成率</p>
           <p className="text-2xl font-bold text-gold">{stats.rate}%</p>
         </div>
@@ -205,24 +205,24 @@ export default function Tasks() {
         <div className="flex gap-2">
           <button
             onClick={() => setViewMode('matrix')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
               viewMode === 'matrix'
                 ? 'bg-gold text-ink'
                 : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
             }`}
           >
-            <LayoutGrid size={14} />
+            <LayoutGrid size={16} />
             四象限
           </button>
           <button
             onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
               viewMode === 'list'
                 ? 'bg-gold text-ink'
                 : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
             }`}
           >
-            <List size={14} />
+            <List size={16} />
             列表
           </button>
         </div>
@@ -238,13 +238,13 @@ export default function Tasks() {
 
       {/* Matrix View */}
       {viewMode === 'matrix' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
           {(['A', 'B', 'C', 'D'] as Quadrant[]).map((q) => {
             const meta = quadrantMeta[q];
             return (
               <div
                 key={q}
-                className={`card ${meta.tint} border ${meta.border} p-4 min-h-[200px]`}
+                className={`card ${meta.tint} border ${meta.border} p-3 md:p-4 min-h-[200px]`}
               >
                 <div className="flex items-center gap-2 mb-3">
                   <div
@@ -280,7 +280,7 @@ export default function Tasks() {
 
       {/* List View */}
       {viewMode === 'list' && (
-        <div className="space-y-4">
+        <div className="space-y-3 md:space-y-4">
           {/* Status filter */}
           <div className="flex items-center gap-2">
             {(['all', 'pending', 'completed'] as StatusFilter[]).map((s) => {
@@ -343,7 +343,7 @@ export default function Tasks() {
           {/* Task list */}
           <div className="space-y-2">
             {filteredTasks.length === 0 ? (
-              <div className="card p-8 text-center">
+              <div className="card p-5 md:p-8 text-center">
                 <p className="text-text-secondary text-sm">没有匹配的任务</p>
               </div>
             ) : (
@@ -361,8 +361,8 @@ export default function Tasks() {
       )}
 
       {/* 必做清单 */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-text-primary font-display mb-4">必做清单</h2>
+      <div className="card p-4 md:p-6">
+        <h2 className="text-lg font-semibold text-text-primary font-display mb-3 md:mb-4">必做清单</h2>
 
         {/* Daily */}
         <ChecklistSection
@@ -413,7 +413,7 @@ export default function Tasks() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/60" onClick={() => setShowModal(false)} />
-          <div className="relative bg-card border border-border-custom rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+          <div className="relative bg-card border border-border-custom rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 md:p-6">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-semibold text-text-primary font-display">添加任务</h3>
               <button
@@ -424,7 +424,7 @@ export default function Tasks() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               {/* Title */}
               <div>
                 <label className="block text-xs text-text-secondary mb-1.5">
@@ -529,7 +529,7 @@ export default function Tasks() {
               <button
                 onClick={handleAddTask}
                 disabled={!form.title.trim()}
-                className={`w-full py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                className={`w-full py-2 md:py-2.5 rounded-lg text-sm font-semibold transition-all ${
                   form.title.trim()
                     ? 'btn-gold'
                     : 'bg-border-custom text-text-muted cursor-not-allowed'
@@ -572,7 +572,7 @@ function ChecklistSection({
         className="w-full flex items-center justify-between py-3 text-sm text-text-primary hover:text-gold transition-colors"
       >
         <div className="flex items-center gap-2">
-          {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
           <span className="font-medium">{title}</span>
           <span className="text-xs text-text-muted">
             {completedCount}/{items.length}

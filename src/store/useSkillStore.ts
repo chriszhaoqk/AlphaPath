@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import client from '@/api/client';
+import { persist } from 'zustand/middleware';
 
 export interface SkillScores {
   industry: number;
@@ -17,6 +17,8 @@ export interface Assessment {
   createdAt: string;
 }
 
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
 interface SkillState {
   assessments: Assessment[];
   loading: boolean;
@@ -26,36 +28,37 @@ interface SkillState {
   getLatestScores: () => SkillScores | null;
 }
 
-export const useSkillStore = create<SkillState>((set, get) => ({
-  assessments: [],
-  loading: false,
-  error: null,
+export const useSkillStore = create<SkillState>()(
+  persist(
+    (set, get) => ({
+      assessments: [],
+      loading: false,
+      error: null,
 
-  fetchAssessments: async () => {
-    set({ loading: true, error: null });
-    try {
-      const res = await client.get('/skills');
-      set({ assessments: res.data.data || [], loading: false });
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '获取技能评估失败', loading: false });
+      fetchAssessments: async () => {
+        // Data is already in state from persist, no-op
+      },
+
+      addAssessment: async (assessment) => {
+        const newAssessment: Assessment = {
+          ...assessment,
+          id: generateId(),
+          createdAt: new Date().toISOString(),
+        };
+        set((state) => ({ assessments: [...state.assessments, newAssessment] }));
+      },
+
+      getLatestScores: () => {
+        const { assessments } = get();
+        if (assessments.length === 0) return null;
+        const sorted = [...assessments].sort(
+          (a, b) => new Date(b.assessedAt).getTime() - new Date(a.assessedAt).getTime()
+        );
+        return sorted[0].scores;
+      },
+    }),
+    {
+      name: 'alphapath-skills',
     }
-  },
-
-  addAssessment: async (assessment) => {
-    try {
-      const res = await client.post('/skills', assessment);
-      set((state) => ({ assessments: [...state.assessments, res.data.data || res.data] }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '添加技能评估失败' });
-    }
-  },
-
-  getLatestScores: () => {
-    const { assessments } = get();
-    if (assessments.length === 0) return null;
-    const sorted = [...assessments].sort(
-      (a, b) => new Date(b.assessedAt).getTime() - new Date(a.assessedAt).getTime()
-    );
-    return sorted[0].scores;
-  },
-}));
+  )
+);

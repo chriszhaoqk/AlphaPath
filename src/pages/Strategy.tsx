@@ -19,11 +19,11 @@ const TEMPLATES: StrategyTemplate[] = [
     iconColor: 'text-positive',
     borderColor: 'border-positive/30',
     fields: [
-      { key: 'positionSizing', label: '仓位指引', defaultValue: '80-95%' },
-      { key: 'entryRules', label: '配置方向', defaultValue: '成长>价值，进攻性行业集中' },
-      { key: 'description', label: '选股策略', defaultValue: '景气度最高+弹性最大' },
-      { key: 'riskManagement', label: '信号', defaultValue: '成交量放大/融资余额上升/新基金爆款' },
-      { key: 'exitRules', label: '退出', defaultValue: '估值极端+情绪过热时逐步减仓' },
+      { key: 'positionGuidance', label: '仓位指引', defaultValue: '80-95%' },
+      { key: 'allocationGuidance', label: '配置方向', defaultValue: '成长>价值，进攻性行业集中' },
+      { key: 'stockSelection', label: '选股策略', defaultValue: '景气度最高+弹性最大' },
+      { key: 'signals', label: '信号', defaultValue: '成交量放大/融资余额上升/新基金爆款' },
+      { key: 'hedging', label: '对冲', defaultValue: '估值极端+情绪过热时逐步减仓' },
     ],
   },
   {
@@ -33,11 +33,11 @@ const TEMPLATES: StrategyTemplate[] = [
     iconColor: 'text-urgent',
     borderColor: 'border-urgent/30',
     fields: [
-      { key: 'positionSizing', label: '仓位指引', defaultValue: '20-40%' },
-      { key: 'entryRules', label: '配置方向', defaultValue: '高股息+低估值+防御行业' },
-      { key: 'description', label: '选股策略', defaultValue: '现金流充裕+护城河深+分红稳定' },
-      { key: 'riskManagement', label: '对冲', defaultValue: '股指期货/期权保护' },
-      { key: 'exitRules', label: '信号', defaultValue: '破净率>10%/换手率极低/情绪冰点时逐步加仓' },
+      { key: 'positionGuidance', label: '仓位指引', defaultValue: '20-40%' },
+      { key: 'allocationGuidance', label: '配置方向', defaultValue: '高股息+低估值+防御行业' },
+      { key: 'stockSelection', label: '选股策略', defaultValue: '现金流充裕+护城河深+分红稳定' },
+      { key: 'signals', label: '信号', defaultValue: '破净率>10%/换手率极低/情绪冰点时逐步加仓' },
+      { key: 'hedging', label: '对冲', defaultValue: '股指期货/期权保护' },
     ],
   },
   {
@@ -47,11 +47,11 @@ const TEMPLATES: StrategyTemplate[] = [
     iconColor: 'text-gold',
     borderColor: 'border-gold/30',
     fields: [
-      { key: 'positionSizing', label: '仓位指引', defaultValue: '50-70%' },
-      { key: 'entryRules', label: '配置方向', defaultValue: '结构性行业轮动' },
-      { key: 'description', label: '选股策略', defaultValue: '业绩确定性+估值合理' },
-      { key: 'riskManagement', label: '节奏', defaultValue: '跌买涨卖，控制节奏' },
-      { key: 'exitRules', label: '增强', defaultValue: '量化因子+事件驱动' },
+      { key: 'positionGuidance', label: '仓位指引', defaultValue: '50-70%' },
+      { key: 'allocationGuidance', label: '配置方向', defaultValue: '结构性行业轮动' },
+      { key: 'stockSelection', label: '选股策略', defaultValue: '业绩确定性+估值合理' },
+      { key: 'signals', label: '信号', defaultValue: '跌买涨卖，控制节奏' },
+      { key: 'hedging', label: '增强', defaultValue: '量化因子+事件驱动' },
     ],
   },
 ];
@@ -123,8 +123,8 @@ function StrategyCard({
   };
 
   return (
-    <div className={`card p-5 border-l-4 ${template.borderColor}`}>
-      <div className="flex items-center justify-between mb-4">
+    <div className={`card p-4 md:p-5 border-l-4 ${template.borderColor}`}>
+      <div className="flex items-center justify-between mb-3 md:mb-4">
         <div className="flex items-center gap-2">
           <span className={template.iconColor}>{template.icon}</span>
           <h3 className="text-lg font-bold text-text-primary font-display">{template.name}</h3>
@@ -206,11 +206,11 @@ export default function Strategy() {
   })();
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-4 md:space-y-6">
       <h1 className="text-2xl font-bold text-text-primary font-display">策略框架</h1>
 
       {/* Strategy Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
         {TEMPLATES.map((template) => {
           const strategy = strategies.find((s) => s.type === template.type);
           return (
@@ -229,17 +229,17 @@ export default function Strategy() {
         <h2 className="text-lg font-bold text-text-primary font-display mb-3">市场信号检查</h2>
 
         {/* Market Bias Summary */}
-        <div className="card p-4 mb-4 flex items-center gap-3">
+        <div className="card p-3 md:p-4 mb-3 md:mb-4 flex items-center gap-3">
           <span className="text-sm text-text-secondary">当前市场状态倾向:</span>
           <span className="text-lg font-bold font-display" style={{ color: biasColor }}>
             {marketBias}
           </span>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
           {SIGNAL_CATEGORY_META.map(({ key, label, color }) => (
-            <div key={key} className="card p-4">
-              <h4 className="text-sm font-semibold mb-3" style={{ color }}>
+            <div key={key} className="card p-3 md:p-4">
+              <h4 className="text-sm font-semibold mb-2 md:mb-3" style={{ color }}>
                 {label}
               </h4>
               <div className="space-y-2">

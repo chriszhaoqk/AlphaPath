@@ -27,7 +27,7 @@ function getScoreTwClass(score: number): string {
 
 function ScoreCard({ label, score, color }: { label: string; score: number; color: string }) {
   return (
-    <div className="card p-4 flex flex-col items-center gap-2">
+    <div className="card p-3 md:p-4 flex flex-col items-center gap-2">
       <span className="text-xs text-text-secondary">{label}</span>
       <span className="text-2xl font-bold font-display" style={{ color }}>
         {score}
@@ -137,8 +137,8 @@ function GrowthCurves({ assessments }: { assessments: Assessment[] }) {
 function AssessmentDetail({ assessment, onClose }: { assessment: Assessment; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div className="card p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-between items-center mb-4">
+      <div className="card p-4 md:p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+        <div className="flex justify-between items-center mb-3 md:mb-4">
           <h3 className="text-lg font-bold text-text-primary font-display">评估详情</h3>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary">✕</button>
         </div>
@@ -218,7 +218,7 @@ export default function Skills() {
   );
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-4 md:space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-text-primary font-display">技能雷达</h1>
         <button onClick={() => setShowForm(!showForm)} className="btn-gold flex items-center gap-1.5 text-sm">
@@ -228,7 +228,7 @@ export default function Skills() {
       </div>
 
       {/* Current Radar Chart */}
-      <div className="card p-6 flex justify-center">
+      <div className="card p-4 md:p-6 flex justify-center">
         <RadarChart scores={latestScores} maxScore={10} size={320} />
       </div>
 
@@ -241,7 +241,7 @@ export default function Skills() {
 
       {/* New Assessment Form */}
       {showForm && (
-        <div className="card p-6 space-y-4">
+        <div className="card p-4 md:p-6 space-y-3 md:space-y-4">
           <h3 className="text-lg font-bold text-text-primary font-display">新建评估</h3>
           <div className="space-y-3">
             {DIMENSION_META.map(({ key, label }) => (
@@ -284,7 +284,7 @@ export default function Skills() {
       <div>
         <h2 className="text-lg font-bold text-text-primary font-display mb-3">评估历史</h2>
         {sortedAssessments.length === 0 ? (
-          <div className="card p-8 text-center">
+          <div className="card p-5 md:p-8 text-center">
             <p className="text-text-secondary">暂无评估记录</p>
           </div>
         ) : (
@@ -293,7 +293,7 @@ export default function Skills() {
               <button
                 key={a.id}
                 onClick={() => setSelectedAssessment(a)}
-                className="card p-4 w-full text-left flex items-center gap-4"
+                className="card p-3 md:p-4 w-full text-left flex items-center gap-3 md:gap-4"
               >
                 <span className="text-sm text-text-secondary shrink-0">
                   {new Date(a.assessedAt).toLocaleDateString('zh-CN')}
@@ -311,7 +311,7 @@ export default function Skills() {
                 {a.notes && (
                   <span className="text-xs text-text-muted truncate flex-1">{a.notes}</span>
                 )}
-                <ChevronDown size={14} className="text-text-muted shrink-0" />
+                <ChevronDown size={16} className="text-text-muted shrink-0" />
               </button>
             ))}
           </div>

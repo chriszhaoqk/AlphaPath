@@ -148,7 +148,7 @@ export default function JournalPage() {
   };
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-text-primary font-display">投资日记</h1>
@@ -157,7 +157,7 @@ export default function JournalPage() {
       {/* Today reminder */}
       {!hasTodayJournal && activeTab === 'list' && (
         <div
-          className="card p-4 border-gold/30 bg-gold/5 cursor-pointer"
+          className="card p-3 md:p-4 border-gold/30 bg-gold/5 cursor-pointer"
           onClick={() => startWrite()}
         >
           <div className="flex items-center gap-3">
@@ -198,15 +198,15 @@ export default function JournalPage() {
       {activeTab === 'list' && (
         <>
           {loading ? (
-            <div className="card p-8 text-center text-text-secondary">加载中...</div>
+            <div className="card p-5 md:p-8 text-center text-text-secondary">加载中...</div>
           ) : sortedJournals.length === 0 ? (
-            <div className="card p-8 text-center text-text-secondary">暂无日记记录</div>
+            <div className="card p-5 md:p-8 text-center text-text-secondary">暂无日记记录</div>
           ) : (
             <div className="space-y-3">
               {sortedJournals.map((journal) => (
                 <div key={journal.id} className="card overflow-hidden">
                   <div
-                    className="p-4 cursor-pointer"
+                    className="p-3 md:p-4 cursor-pointer"
                     onClick={() => setExpandedId(expandedId === journal.id ? null : journal.id)}
                   >
                     <div className="flex items-center gap-3">
@@ -233,7 +233,7 @@ export default function JournalPage() {
 
                   {/* Expanded content */}
                   {expandedId === journal.id && (
-                    <div className="px-4 pb-4 space-y-3 border-t border-border-custom pt-3">
+                    <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-3 border-t border-border-custom pt-3">
                       {journal.market_view && (
                         <div>
                           <p className="text-xs text-text-muted mb-1">市场观点</p>
@@ -328,7 +328,7 @@ export default function JournalPage() {
 
       {/* Write view */}
       {activeTab === 'write' && (
-        <div className="card p-5 space-y-4">
+        <div className="card p-4 md:p-5 space-y-3 md:space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-text-primary font-display">
               {editingId ? '编辑日记' : '写日记'}
@@ -416,7 +416,7 @@ export default function JournalPage() {
           <button
             onClick={handleSave}
             disabled={!form.date}
-            className="btn-gold w-full py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+            className="btn-gold w-full py-2 md:py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
           >
             保存
           </button>

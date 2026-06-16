@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import client from '@/api/client';
+import { persist } from 'zustand/middleware';
 
 interface User {
   id: string;
@@ -20,61 +20,50 @@ interface AuthState {
   clearError: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  token: localStorage.getItem('token'),
-  isAuthenticated: !!localStorage.getItem('token'),
-  loading: false,
-  error: null,
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      loading: false,
+      error: null,
 
-  login: async (email: string, password: string) => {
-    set({ loading: true, error: null });
-    try {
-      const res = await client.post('/auth/login', { email, password });
-      const { token, user } = res.data.data || res.data;
-      localStorage.setItem('token', token);
-      set({ user, token, isAuthenticated: true, loading: false });
-    } catch (err: any) {
-      const message = err.response?.data?.error || '登录失败，请重试';
-      set({ error: message, loading: false });
-      throw err;
+      login: async (email: string, password: string) => {
+        set({ loading: true, error: null });
+        const user: User = {
+          id: `local-${Date.now()}`,
+          email,
+          name: email.split('@')[0],
+        };
+        const token = `local-${Date.now()}`;
+        set({ user, token, isAuthenticated: true, loading: false });
+      },
+
+      register: async (email: string, password: string, name: string) => {
+        set({ loading: true, error: null });
+        const user: User = {
+          id: `local-${Date.now()}`,
+          email,
+          name,
+        };
+        const token = `local-${Date.now()}`;
+        set({ user, token, isAuthenticated: true, loading: false });
+      },
+
+      logout: () => {
+        set({ user: null, token: null, isAuthenticated: false });
+      },
+
+      checkAuth: async () => {
+        // Just check current state from persist
+        // No API call needed
+      },
+
+      clearError: () => set({ error: null }),
+    }),
+    {
+      name: 'alphapath-auth',
     }
-  },
-
-  register: async (email: string, password: string, name: string) => {
-    set({ loading: true, error: null });
-    try {
-      const res = await client.post('/auth/register', { email, password, name });
-      const { token, user } = res.data.data || res.data;
-      localStorage.setItem('token', token);
-      set({ user, token, isAuthenticated: true, loading: false });
-    } catch (err: any) {
-      const message = err.response?.data?.error || '注册失败，请重试';
-      set({ error: message, loading: false });
-      throw err;
-    }
-  },
-
-  logout: () => {
-    localStorage.removeItem('token');
-    set({ user: null, token: null, isAuthenticated: false });
-  },
-
-  checkAuth: async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      set({ isAuthenticated: false, user: null, token: null });
-      return;
-    }
-    try {
-      const res = await client.get('/auth/me');
-      const user = res.data.data || res.data;
-      set({ user, isAuthenticated: true, token });
-    } catch {
-      localStorage.removeItem('token');
-      set({ user: null, token: null, isAuthenticated: false });
-    }
-  },
-
-  clearError: () => set({ error: null }),
-}));
+  )
+);

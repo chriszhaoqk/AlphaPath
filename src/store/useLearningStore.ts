@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import client from '@/api/client';
+import { persist } from 'zustand/middleware';
 
 export interface Learning {
   id: string;
@@ -13,6 +13,8 @@ export interface Learning {
   updated_at: string;
 }
 
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
 interface LearningState {
   learnings: Learning[];
   loading: boolean;
@@ -23,47 +25,42 @@ interface LearningState {
   deleteLearning: (id: string) => Promise<void>;
 }
 
-export const useLearningStore = create<LearningState>((set) => ({
-  learnings: [],
-  loading: false,
-  error: null,
+export const useLearningStore = create<LearningState>()(
+  persist(
+    (set) => ({
+      learnings: [],
+      loading: false,
+      error: null,
 
-  fetchLearnings: async () => {
-    set({ loading: true, error: null });
-    try {
-      const res = await client.get('/learnings');
-      set({ learnings: res.data.data, loading: false });
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '获取学习记录失败', loading: false });
-    }
-  },
+      fetchLearnings: async () => {
+        // Data is already in state from persist, no-op
+      },
 
-  addLearning: async (learning) => {
-    try {
-      const res = await client.post('/learnings', learning);
-      set((state) => ({ learnings: [...state.learnings, res.data.data] }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '添加学习记录失败' });
-    }
-  },
+      addLearning: async (learning) => {
+        const now = new Date().toISOString();
+        const newLearning: Learning = {
+          ...learning,
+          id: generateId(),
+          created_at: now,
+          updated_at: now,
+        };
+        set((state) => ({ learnings: [...state.learnings, newLearning] }));
+      },
 
-  updateLearning: async (id, updates) => {
-    try {
-      const res = await client.put(`/learnings/${id}`, updates);
-      set((state) => ({
-        learnings: state.learnings.map((l) => (l.id === id ? res.data.data : l)),
-      }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '更新学习记录失败' });
-    }
-  },
+      updateLearning: async (id, updates) => {
+        set((state) => ({
+          learnings: state.learnings.map((l) =>
+            l.id === id ? { ...l, ...updates, updated_at: new Date().toISOString() } : l
+          ),
+        }));
+      },
 
-  deleteLearning: async (id) => {
-    try {
-      await client.delete(`/learnings/${id}`);
-      set((state) => ({ learnings: state.learnings.filter((l) => l.id !== id) }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '删除学习记录失败' });
+      deleteLearning: async (id) => {
+        set((state) => ({ learnings: state.learnings.filter((l) => l.id !== id) }));
+      },
+    }),
+    {
+      name: 'alphapath-learnings',
     }
-  },
-}));
+  )
+);

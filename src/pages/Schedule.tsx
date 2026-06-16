@@ -203,7 +203,7 @@ export default function Schedule() {
   };
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -227,24 +227,24 @@ export default function Schedule() {
       <div className="flex gap-2">
         <button
           onClick={() => setMode('weekday')}
-          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`px-3 py-2 md:px-5 rounded-lg text-sm font-medium transition-all ${
             mode === 'weekday'
               ? 'bg-gold text-ink'
               : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
           }`}
         >
-          <Calendar size={14} className="inline mr-1.5 -mt-0.5" />
+          <Calendar size={16} className="inline mr-1.5 -mt-0.5" />
           工作日模板
         </button>
         <button
           onClick={() => setMode('weekend')}
-          className={`px-5 py-2 rounded-lg text-sm font-medium transition-all ${
+          className={`px-3 py-2 md:px-5 rounded-lg text-sm font-medium transition-all ${
             mode === 'weekend'
               ? 'bg-gold text-ink'
               : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
           }`}
         >
-          <Calendar size={14} className="inline mr-1.5 -mt-0.5" />
+          <Calendar size={16} className="inline mr-1.5 -mt-0.5" />
           周末模板
         </button>
         {isWeekend && mode === 'weekday' && (
@@ -253,8 +253,8 @@ export default function Schedule() {
       </div>
 
       {/* Schedule Timeline */}
-      <div className="card p-6">
-        <h2 className="text-lg font-semibold text-text-primary font-display mb-4">
+      <div className="card p-4 md:p-6">
+        <h2 className="text-lg font-semibold text-text-primary font-display mb-3 md:mb-4">
           {mode === 'weekday' ? '工作日日程' : '周末日程'}
         </h2>
 
@@ -384,8 +384,8 @@ export default function Schedule() {
       </div>
 
       {/* Today's Tasks */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-4">
+      <div className="card p-4 md:p-6">
+        <div className="flex items-center justify-between mb-3 md:mb-4">
           <h2 className="text-lg font-semibold text-text-primary font-display">今日任务</h2>
           <span className="text-xs text-text-muted">
             {todayTasks.filter((t) => t.completed).length}/{todayTasks.length} 已完成

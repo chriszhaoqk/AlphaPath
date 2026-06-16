@@ -38,3 +38,19 @@ data/
 
 # Placeholder
 .placeholder
+.vercel
+
+# Build artifacts
+release/
+*.tar.gz
+
+# Proxy patch (dev only)
+proxy-patch.cjs
+
+# IGA config (contains credentials)
+iga.config.json
+
+# Android build cache
+android/.gradle/
+android/app/build/
+android/build/

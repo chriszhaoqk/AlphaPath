@@ -91,13 +91,13 @@ export default function Settings() {
   };
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-4 md:space-y-6">
       <h1 className="text-2xl font-bold text-text-primary font-display">设置</h1>
 
       {/* Data Management */}
       <section>
         <h2 className="text-lg font-bold text-text-primary font-display mb-3">数据管理</h2>
-        <div className="card p-5 space-y-4">
+        <div className="card p-4 md:p-5 space-y-3 md:space-y-4">
           {/* Cloud Sync Toggle */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -137,7 +137,7 @@ export default function Settings() {
             <button
               onClick={handleSync}
               disabled={syncing}
-              className="btn-gold text-sm px-4 py-1.5"
+              className="btn-gold text-sm px-3 py-1.5 md:px-4"
             >
               {syncing ? '同步中...' : '立即同步'}
             </button>
@@ -149,8 +149,8 @@ export default function Settings() {
               <p className="text-sm text-text-primary">导出数据</p>
               <p className="text-xs text-text-muted">下载所有用户数据的JSON文件</p>
             </div>
-            <button onClick={handleExport} className="flex items-center gap-1.5 px-4 py-1.5 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary hover:border-gold/50 transition-colors">
-              <Download size={14} />
+            <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 md:px-4 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary hover:border-gold/50 transition-colors">
+              <Download size={16} />
               导出
             </button>
           </div>
@@ -167,9 +167,9 @@ export default function Settings() {
                   handleCreateSnapshot();
                 }
               }}
-              className="flex items-center gap-1.5 px-4 py-1.5 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary hover:border-gold/50 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-1.5 md:px-4 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary hover:border-gold/50 transition-colors"
             >
-              <Save size={14} />
+              <Save size={16} />
               创建快照
             </button>
           </div>
@@ -179,7 +179,7 @@ export default function Settings() {
       {/* Version History */}
       <section>
         <h2 className="text-lg font-bold text-text-primary font-display mb-3">版本历史</h2>
-        <div className="card p-5 space-y-4">
+        <div className="card p-4 md:p-5 space-y-3 md:space-y-4">
           {/* Create new version */}
           <div className="flex gap-2">
             <input
@@ -192,7 +192,7 @@ export default function Settings() {
                 if (e.key === 'Enter') handleCreateSnapshot();
               }}
             />
-            <button onClick={handleCreateSnapshot} className="btn-gold text-sm px-4">
+            <button onClick={handleCreateSnapshot} className="btn-gold text-sm px-3 md:px-4">
               创建
             </button>
           </div>
@@ -221,7 +221,7 @@ export default function Settings() {
       {/* Account */}
       <section>
         <h2 className="text-lg font-bold text-text-primary font-display mb-3">账户</h2>
-        <div className="card p-5 space-y-4">
+        <div className="card p-4 md:p-5 space-y-3 md:space-y-4">
           {/* User info */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -278,7 +278,7 @@ export default function Settings() {
           <div className="pt-4 border-t border-border-custom">
             <button
               onClick={logout}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-urgent/10 text-urgent rounded-lg hover:bg-urgent/20 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm bg-urgent/10 text-urgent rounded-lg hover:bg-urgent/20 transition-colors"
             >
               <LogOut size={16} />
               退出登录
@@ -290,7 +290,7 @@ export default function Settings() {
       {/* About */}
       <section>
         <h2 className="text-lg font-bold text-text-primary font-display mb-3">关于</h2>
-        <div className="card p-5">
+        <div className="card p-4 md:p-5">
           <div className="flex items-center gap-3 mb-3">
             <Info size={20} className="text-gold" />
             <div>

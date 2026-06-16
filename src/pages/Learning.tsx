@@ -131,7 +131,7 @@ export default function LearningPage() {
   };
 
   return (
-    <div className="animate-fade-in-up space-y-6">
+    <div className="animate-fade-in-up space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-text-primary font-display">学习追踪</h1>
@@ -145,16 +145,16 @@ export default function LearningPage() {
       </div>
 
       {/* Statistics bar */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="card p-4 text-center">
+      <div className="grid grid-cols-3 gap-3 md:gap-4">
+        <div className="card p-3 md:p-4 text-center">
           <p className="text-xs text-text-secondary mb-1">本月完成</p>
           <p className="text-2xl font-bold text-positive">{stats.completed}</p>
         </div>
-        <div className="card p-4 text-center">
+        <div className="card p-3 md:p-4 text-center">
           <p className="text-xs text-text-secondary mb-1">进行中</p>
           <p className="text-2xl font-bold text-gold">{stats.inProgress}</p>
         </div>
-        <div className="card p-4 text-center">
+        <div className="card p-3 md:p-4 text-center">
           <p className="text-xs text-text-secondary mb-1">待开始</p>
           <p className="text-2xl font-bold text-text-secondary">{stats.notStarted}</p>
         </div>
@@ -166,7 +166,7 @@ export default function LearningPage() {
           <button
             key={tab.key}
             onClick={() => setFilter(tab.key)}
-            className={`px-4 py-1.5 rounded-full text-sm whitespace-nowrap transition-all ${
+            className={`px-3 py-1.5 md:px-4 rounded-full text-sm whitespace-nowrap transition-all ${
               filter === tab.key
                 ? 'bg-gold/20 text-gold border border-gold/30'
                 : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
@@ -179,15 +179,15 @@ export default function LearningPage() {
 
       {/* Learning list */}
       {loading ? (
-        <div className="card p-8 text-center text-text-secondary">加载中...</div>
+        <div className="card p-5 md:p-8 text-center text-text-secondary">加载中...</div>
       ) : filteredLearnings.length === 0 ? (
-        <div className="card p-8 text-center text-text-secondary">暂无学习记录</div>
+        <div className="card p-5 md:p-8 text-center text-text-secondary">暂无学习记录</div>
       ) : (
         <div className="space-y-3">
           {filteredLearnings.map((learning) => (
             <div
               key={learning.id}
-              className="card p-4 group cursor-pointer"
+              className="card p-3 md:p-4 group cursor-pointer"
               onClick={() => openEditModal(learning)}
             >
               <div className="flex items-start gap-3">
@@ -202,13 +202,13 @@ export default function LearningPage() {
                         onClick={(e) => { e.stopPropagation(); openEditModal(learning); }}
                         className="p-1 rounded hover:bg-gold/10 text-text-muted hover:text-gold transition-colors"
                       >
-                        <Pencil size={14} />
+                        <Pencil size={16} />
                       </button>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDelete(learning.id); }}
                         className="p-1 rounded hover:bg-urgent/10 text-text-muted hover:text-urgent transition-colors"
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
                   </div>
@@ -247,8 +247,8 @@ export default function LearningPage() {
 
       {/* Learning type distribution */}
       {learnings.length > 0 && (
-        <div className="card p-5">
-          <h3 className="text-sm font-semibold text-text-primary mb-4">学习类型分布</h3>
+        <div className="card p-4 md:p-5">
+          <h3 className="text-sm font-semibold text-text-primary mb-3 md:mb-4">学习类型分布</h3>
           <div className="space-y-3">
             {(Object.entries(typeDistribution) as [LearningType, number][]).map(([type, count]) => {
               const config = TYPE_CONFIG[type];
@@ -275,7 +275,7 @@ export default function LearningPage() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShowModal(false)}>
           <div
-            className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+            className="card p-4 md:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
@@ -287,7 +287,7 @@ export default function LearningPage() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3 md:space-y-4">
               {/* Title */}
               <div>
                 <label className="block text-xs text-text-secondary mb-1.5">标题</label>
@@ -369,7 +369,7 @@ export default function LearningPage() {
               <button
                 onClick={handleSave}
                 disabled={!form.title.trim()}
-                className="btn-gold w-full py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                className="btn-gold w-full py-2 md:py-2.5 text-sm disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 保存
               </button>

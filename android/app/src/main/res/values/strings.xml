@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">AlphaPath</string>
+    <string name="title_activity_main">AlphaPath</string>
+    <string name="package_name">com.alphapath.app</string>
+    <string name="custom_url_scheme">com.alphapath.app</string>
+</resources>

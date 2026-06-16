@@ -1,0 +1,28 @@
+{
+  "appId": "com.alphapath.app",
+  "productName": "AlphaPath",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "electron-main.js",
+    "dist/**/*"
+  ],
+  "buildDependenciesFromSource": false,
+  "nodeGypRebuild": false,
+  "npmRebuild": false,
+  "mac": {
+    "target": ["dmg"],
+    "icon": "dist/pwa-512x512.png",
+    "category": "public.app-category.finance"
+  },
+  "win": {
+    "target": ["nsis"],
+    "icon": "dist/pwa-512x512.png"
+  },
+  "linux": {
+    "target": ["AppImage"],
+    "icon": "dist/pwa-512x512.png",
+    "category": "Finance"
+  }
+}

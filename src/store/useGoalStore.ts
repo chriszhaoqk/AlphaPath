@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import client from '@/api/client';
+import { persist } from 'zustand/middleware';
 
 export interface KeyResult {
   id: string;
@@ -39,6 +39,8 @@ export interface Goal {
   updatedAt: string;
 }
 
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+
 interface GoalState {
   goals: Goal[];
   loading: boolean;
@@ -54,135 +56,117 @@ interface GoalState {
   updateMilestone: (goalId: string, milestoneId: string, updates: Partial<Milestone>) => Promise<void>;
 }
 
-export const useGoalStore = create<GoalState>((set, get) => ({
-  goals: [],
-  loading: false,
-  error: null,
+export const useGoalStore = create<GoalState>()(
+  persist(
+    (set, get) => ({
+      goals: [],
+      loading: false,
+      error: null,
 
-  fetchGoals: async () => {
-    set({ loading: true, error: null });
-    try {
-      const res = await client.get('/goals');
-      set({ goals: res.data.data || [], loading: false });
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '获取目标失败', loading: false });
-    }
-  },
+      fetchGoals: async () => {
+        // Data is already in state from persist, no-op
+      },
 
-  addGoal: async (goal) => {
-    try {
-      const res = await client.post('/goals', { ...goal, milestones: [], okrs: [] });
-      set((state) => ({ goals: [...state.goals, res.data.data || res.data] }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '添加目标失败' });
-    }
-  },
+      addGoal: async (goal) => {
+        const now = new Date().toISOString();
+        const newGoal: Goal = {
+          ...goal,
+          id: generateId(),
+          milestones: [],
+          okrs: [],
+          createdAt: now,
+          updatedAt: now,
+        };
+        set((state) => ({ goals: [...state.goals, newGoal] }));
+      },
 
-  updateGoal: async (id, updates) => {
-    try {
-      const res = await client.put(`/goals/${id}`, updates);
-      set((state) => ({
-        goals: state.goals.map((g) => (g.id === id ? res.data.data || res.data : g)),
-      }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '更新目标失败' });
-    }
-  },
+      updateGoal: async (id, updates) => {
+        set((state) => ({
+          goals: state.goals.map((g) =>
+            g.id === id ? { ...g, ...updates, updatedAt: new Date().toISOString() } : g
+          ),
+        }));
+      },
 
-  deleteGoal: async (id) => {
-    try {
-      await client.delete(`/goals/${id}`);
-      set((state) => ({ goals: state.goals.filter((g) => g.id !== id) }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '删除目标失败' });
-    }
-  },
+      deleteGoal: async (id) => {
+        set((state) => ({ goals: state.goals.filter((g) => g.id !== id) }));
+      },
 
-  addOKR: async (goalId, okr) => {
-    try {
-      const res = await client.post(`/goals/${goalId}/okrs`, okr);
-      set((state) => ({
-        goals: state.goals.map((g) =>
-          g.id === goalId ? { ...g, okrs: [...g.okrs, res.data.data || res.data] } : g
-        ),
-      }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '添加OKR失败' });
-    }
-  },
+      addOKR: async (goalId, okr) => {
+        const newOKR: OKR = { ...okr, id: generateId() };
+        set((state) => ({
+          goals: state.goals.map((g) =>
+            g.id === goalId ? { ...g, okrs: [...g.okrs, newOKR], updatedAt: new Date().toISOString() } : g
+          ),
+        }));
+      },
 
-  updateOKR: async (goalId, okrId, updates) => {
-    try {
-      const res = await client.put(`/goals/${goalId}/okrs/${okrId}`, updates);
-      set((state) => ({
-        goals: state.goals.map((g) =>
-          g.id === goalId
-            ? { ...g, okrs: g.okrs.map((o) => (o.id === okrId ? res.data.data || res.data : o)) }
-            : g
-        ),
-      }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '更新OKR失败' });
-    }
-  },
+      updateOKR: async (goalId, okrId, updates) => {
+        set((state) => ({
+          goals: state.goals.map((g) =>
+            g.id === goalId
+              ? {
+                  ...g,
+                  okrs: g.okrs.map((o) => (o.id === okrId ? { ...o, ...updates } : o)),
+                  updatedAt: new Date().toISOString(),
+                }
+              : g
+          ),
+        }));
+      },
 
-  updateKeyResult: async (goalId, okrId, krId, updates) => {
-    try {
-      const res = await client.put(`/goals/${goalId}/okrs/${okrId}/key-results/${krId}`, updates);
-      set((state) => ({
-        goals: state.goals.map((g) =>
-          g.id === goalId
-            ? {
-                ...g,
-                okrs: g.okrs.map((o) =>
-                  o.id === okrId
-                    ? {
-                        ...o,
-                        keyResults: o.keyResults.map((kr) =>
-                          kr.id === krId ? res.data.data || res.data : kr
-                        ),
-                      }
-                    : o
-                ),
-              }
-            : g
-        ),
-      }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '更新关键结果失败' });
-    }
-  },
+      updateKeyResult: async (goalId, okrId, krId, updates) => {
+        set((state) => ({
+          goals: state.goals.map((g) =>
+            g.id === goalId
+              ? {
+                  ...g,
+                  okrs: g.okrs.map((o) =>
+                    o.id === okrId
+                      ? {
+                          ...o,
+                          keyResults: o.keyResults.map((kr) =>
+                            kr.id === krId ? { ...kr, ...updates } : kr
+                          ),
+                        }
+                      : o
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : g
+          ),
+        }));
+      },
 
-  addMilestone: async (goalId, milestone) => {
-    try {
-      const res = await client.post(`/goals/${goalId}/milestones`, milestone);
-      set((state) => ({
-        goals: state.goals.map((g) =>
-          g.id === goalId ? { ...g, milestones: [...g.milestones, res.data.data || res.data] } : g
-        ),
-      }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '添加里程碑失败' });
-    }
-  },
+      addMilestone: async (goalId, milestone) => {
+        const newMilestone: Milestone = { ...milestone, id: generateId() };
+        set((state) => ({
+          goals: state.goals.map((g) =>
+            g.id === goalId
+              ? { ...g, milestones: [...g.milestones, newMilestone], updatedAt: new Date().toISOString() }
+              : g
+          ),
+        }));
+      },
 
-  updateMilestone: async (goalId, milestoneId, updates) => {
-    try {
-      const res = await client.put(`/goals/${goalId}/milestones/${milestoneId}`, updates);
-      set((state) => ({
-        goals: state.goals.map((g) =>
-          g.id === goalId
-            ? {
-                ...g,
-                milestones: g.milestones.map((m) =>
-                  m.id === milestoneId ? res.data.data || res.data : m
-                ),
-              }
-            : g
-        ),
-      }));
-    } catch (err: any) {
-      set({ error: err.response?.data?.error || '更新里程碑失败' });
+      updateMilestone: async (goalId, milestoneId, updates) => {
+        set((state) => ({
+          goals: state.goals.map((g) =>
+            g.id === goalId
+              ? {
+                  ...g,
+                  milestones: g.milestones.map((m) =>
+                    m.id === milestoneId ? { ...m, ...updates } : m
+                  ),
+                  updatedAt: new Date().toISOString(),
+                }
+              : g
+          ),
+        }));
+      },
+    }),
+    {
+      name: 'alphapath-goals',
     }
-  },
-}));
+  )
+);

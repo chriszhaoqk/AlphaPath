@@ -150,13 +150,13 @@ export default function Roadmap() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5 md:space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-text-primary font-display">目标路线图</h1>
       </div>
 
       {goals.length === 0 ? (
-        <div className="card p-8 text-center space-y-4">
+        <div className="card p-5 md:p-8 text-center space-y-3 md:space-y-4">
           <Target size={48} className="mx-auto text-text-muted" />
           <p className="text-text-secondary">还没有目标数据</p>
           <button
@@ -171,12 +171,12 @@ export default function Roadmap() {
         <>
           {/* Phase Timeline */}
           <div className="relative">
-            <h2 className="text-lg font-semibold text-text-primary font-display mb-6">阶段路线</h2>
+            <h2 className="text-lg font-semibold text-text-primary font-display mb-4 md:mb-6">阶段路线</h2>
             <div className="relative pl-8">
               {/* Vertical line */}
               <div className="absolute left-3 top-2 bottom-2 w-0.5 bg-border-custom" />
 
-              <div className="space-y-6">
+              <div className="space-y-4 md:space-y-6">
                 {PHASES.map((phase) => {
                   const goal = goalByPhase.get(phase.phase);
                   const isCurrent = phase.phase === currentPhase;
@@ -200,7 +200,7 @@ export default function Roadmap() {
 
                       {/* Phase card */}
                       <div
-                        className={`card p-5 ${
+                        className={`card p-4 md:p-5 ${
                           isCurrent ? 'border-gold/50' : ''
                         }`}
                       >
@@ -278,7 +278,7 @@ export default function Roadmap() {
 
           {/* Year 1 OKR Section */}
           <div>
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3 md:mb-4">
               <h2 className="text-lg font-semibold text-text-primary font-display">
                 Year 1 OKR
               </h2>
@@ -286,14 +286,14 @@ export default function Roadmap() {
                 onClick={() => setShowAddOKR(!showAddOKR)}
                 className="flex items-center gap-1 text-sm text-gold hover:text-gold-light transition-colors"
               >
-                <Plus size={14} />
+                <Plus size={16} />
                 添加OKR
               </button>
             </div>
 
             {/* Add OKR form */}
             {showAddOKR && (
-              <div className="card p-5 mb-4 space-y-3 animate-fade-in-up">
+              <div className="card p-4 md:p-5 mb-4 space-y-3 animate-fade-in-up">
                 <div>
                   <label className="text-sm text-text-secondary block mb-1">目标 (Objective)</label>
                   <input
@@ -334,15 +334,15 @@ export default function Roadmap() {
 
             {/* OKR list */}
             {currentYearOKRs.length === 0 ? (
-              <div className="card p-6 text-center">
+              <div className="card p-4 md:p-6 text-center">
                 <p className="text-text-muted text-sm">本年度暂无OKR</p>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3 md:space-y-4">
                 {currentYearOKRs.map((okr) => {
                   const parentGoal = goals.find((g) => g.okrs.some((o) => o.id === okr.id));
                   return (
-                    <div key={okr.id} className="card p-5 animate-fade-in-up">
+                    <div key={okr.id} className="card p-4 md:p-5 animate-fade-in-up">
                       <div className="flex items-center gap-2 mb-4">
                         <Target size={16} className="text-gold" />
                         <h3 className="text-base font-semibold text-text-primary">{okr.objective}</h3>
