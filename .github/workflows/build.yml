@@ -9,28 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  # Create a GitHub Release first
-  create-release:
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v${{ github.run_number }}
-          name: AlphaPath v${{ github.run_number }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
   build-android:
-    needs: create-release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,12 +46,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.run_number }}
+          name: AlphaPath v${{ github.run_number }}
           files: android/app/build/outputs/apk/debug/app-debug.apk
+          draft: false
+          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-desktop:
-    needs: create-release
     strategy:
       matrix:
         include:
@@ -120,3 +101,21 @@ jobs:
         run: npx electron-builder --linux --config electron-builder.json --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Publish release after all builds complete
+  publish-release:
+    needs: [build-android, build-desktop]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get version from package.json
+        id: version
+        run: echo "version=$(curl -s -H 'Authorization: token ${{ secrets.GITHUB_TOKEN }}' 'https://api.github.com/repos/${{ github.repository }}/contents/package.json' | python3 -c 'import sys,json,base64; print(json.loads(base64.b64decode(json.load(sys.stdin)["content"]).decode())["version"])')" >> $GITHUB_OUTPUT
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
