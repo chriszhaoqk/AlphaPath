@@ -6,6 +6,7 @@
   },
   "files": [
     "electron-main.cjs",
+    "preload.cjs",
     "dist/**/*"
   ],
   "buildDependenciesFromSource": false,

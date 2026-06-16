@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Cloud, CloudOff, Download, Save, RotateCcw, LogOut, Info } from 'lucide-react';
+import { Cloud, CloudOff, Download, Save, RotateCcw, LogOut, Info, RefreshCw } from 'lucide-react';
 
 interface VersionSnapshot {
   id: string;
@@ -28,6 +28,52 @@ export default function Settings() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
+
+  // Update check
+  const [updateStatus, setUpdateStatus] = useState<'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error'>('idle');
+  const [updateVersion, setUpdateVersion] = useState('');
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [updateError, setUpdateError] = useState('');
+
+  useEffect(() => {
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.onUpdateStatus) {
+      electronAPI.onUpdateStatus((data: any) => {
+        switch (data.type) {
+          case 'available':
+            setUpdateStatus('available');
+            setUpdateVersion(data.version);
+            break;
+          case 'not-available':
+            setUpdateStatus('not-available');
+            break;
+          case 'progress':
+            setUpdateStatus('downloading');
+            setUpdateProgress(data.percent);
+            break;
+          case 'downloaded':
+            setUpdateStatus('downloaded');
+            break;
+          case 'error':
+            setUpdateStatus('error');
+            setUpdateError(data.message);
+            break;
+        }
+      });
+    }
+  }, []);
+
+  const handleCheckUpdate = async () => {
+    setUpdateStatus('checking');
+    setUpdateError('');
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.checkForUpdates) {
+      await electronAPI.checkForUpdates();
+    } else {
+      setUpdateStatus('error');
+      setUpdateError('当前版本不支持自动更新，请手动下载最新版');
+    }
+  };
 
   const handleSync = () => {
     setSyncing(true);
@@ -295,10 +341,53 @@ export default function Settings() {
             <Info size={20} className="text-gold" />
             <div>
               <p className="text-sm font-semibold text-text-primary">AlphaPath</p>
-              <p className="text-xs text-text-muted">版本 1.0.0</p>
+              <p className="text-xs text-text-muted">版本 1.0.3</p>
             </div>
           </div>
-          <p className="text-sm text-text-secondary">基金经理成长管理系统</p>
+          <p className="text-sm text-text-secondary mb-4">基金经理成长管理系统</p>
+
+          {/* Check for updates */}
+          <div className="pt-3 border-t border-border-custom">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-text-primary">版本更新</p>
+                {updateStatus === 'checking' && (
+                  <p className="text-xs text-gold">正在检查更新...</p>
+                )}
+                {updateStatus === 'available' && (
+                  <p className="text-xs text-positive">发现新版本 v{updateVersion}</p>
+                )}
+                {updateStatus === 'not-available' && (
+                  <p className="text-xs text-text-muted">当前已是最新版本</p>
+                )}
+                {updateStatus === 'downloading' && (
+                  <p className="text-xs text-gold">正在下载更新 {updateProgress}%</p>
+                )}
+                {updateStatus === 'downloaded' && (
+                  <p className="text-xs text-positive">更新已就绪，请重启应用</p>
+                )}
+                {updateStatus === 'error' && (
+                  <p className="text-xs text-urgent">{updateError || '检查更新失败'}</p>
+                )}
+              </div>
+              <button
+                onClick={handleCheckUpdate}
+                disabled={updateStatus === 'checking' || updateStatus === 'downloading'}
+                className="flex items-center gap-1.5 px-3 py-1.5 md:px-4 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary hover:border-gold/50 transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={16} className={updateStatus === 'checking' ? 'animate-spin' : ''} />
+                检查更新
+              </button>
+            </div>
+            {updateStatus === 'downloading' && (
+              <div className="mt-2 w-full bg-border-custom rounded-full h-1.5">
+                <div
+                  className="bg-gold h-1.5 rounded-full transition-all"
+                  style={{ width: `${updateProgress}%` }}
+                />
+              </div>
+            )}
+          </div>
         </div>
       </section>
     </div>
