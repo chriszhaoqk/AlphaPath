@@ -25,7 +25,7 @@ const navItems = [
   { to: '/tasks', icon: CheckSquare, label: '任务中心' },
   { to: '/industry', icon: Building2, label: '产业调研' },
   { to: '/learning', icon: BookOpen, label: '学习追踪' },
-  { to: '/journal', icon: PenLine, label: '投资日记' },
+  { to: '/journal', icon: PenLine, label: '投资笔记' },
   { to: '/skills', icon: Radar, label: '技能雷达' },
   { to: '/strategy', icon: Shield, label: '策略框架' },
   { to: '/settings', icon: Settings, label: '设置' },
