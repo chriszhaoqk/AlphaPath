@@ -69,7 +69,18 @@ function httpGet(url, timeout = 15000) {
 }
 
 async function fetchLatestVersion() {
-  // Method 1: GitHub API directly
+  // Method 1: jsDelivr CDN (works in China, fast and reliable)
+  try {
+    const data = await httpGet(`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${GITHUB_REPO}@main/version.json`, 8000);
+    const info = JSON.parse(data);
+    if (info.version) {
+      return info.version;
+    }
+  } catch (err) {
+    console.log('jsDelivr CDN failed:', err.message);
+  }
+
+  // Method 2: GitHub API directly (works with VPN)
   try {
     const data = await httpGet(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`, 10000);
     const release = JSON.parse(data);
@@ -80,7 +91,7 @@ async function fetchLatestVersion() {
     console.log('GitHub API failed:', err.message);
   }
 
-  // Method 2: Parse release page HTML
+  // Method 3: Parse release page HTML
   try {
     const html = await httpGet(`https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`, 10000);
     const tagMatch = html.match(/\/releases\/tag\/v?([\d.]+)/);
