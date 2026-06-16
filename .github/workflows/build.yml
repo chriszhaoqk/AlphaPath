@@ -9,8 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
+  build-desktop:
     strategy:
       matrix:
         include:
@@ -21,6 +20,7 @@ jobs:
           - os: ubuntu-latest
             platform: linux
 
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -58,14 +58,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build Android APK
-        if: matrix.platform == 'linux'
-        run: |
-          npm ci --ignore-scripts
-          npx vite build
-          npx cap sync android
-          cd android && ./gradlew assembleDebug
-
       - name: Get version
         id: version
         run: |
@@ -80,7 +72,7 @@ jobs:
           name: AlphaPath v${{ steps.version.outputs.version }}
           files: |
             release/AlphaPath-*arm64.dmg
-            release/AlphaPath-*arm64.dmg.blockmap
+            release/AlphaPath-*.dmg.blockmap
             release/latest-mac.yml
           draft: false
           prerelease: false
@@ -101,7 +93,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Linux + Android assets
+      - name: Upload Linux assets
         if: matrix.platform == 'linux'
         uses: softprops/action-gh-release@v2
         with:
@@ -109,7 +101,55 @@ jobs:
           files: |
             release/AlphaPath-*.AppImage
             release/latest-linux.yml
-            android/app/build/outputs/apk/debug/app-debug.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Build web app
+        run: npx vite build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build Android APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+
+      - name: Get version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload APK to Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          files: android/app/build/outputs/apk/debug/app-debug.apk
           draft: false
           prerelease: false
         env:
