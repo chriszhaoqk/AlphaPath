@@ -13,6 +13,8 @@ export interface Task {
   completed: boolean;
   dueDate: string; // 日期 YYYY-MM-DD，作为任务归属日期
   completedAt?: string;
+  timeSpent: number; // 已累计时长（秒）
+  timerStartedAt?: string; // 计时器开始时间（ISO string），正在计时中
   createdAt: string;
   updatedAt: string;
 }
