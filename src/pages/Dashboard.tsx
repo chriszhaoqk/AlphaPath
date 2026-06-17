@@ -148,13 +148,13 @@ export default function Dashboard() {
       }));
     const researchItems = researches
       .slice()
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
       .slice(0, 3)
       .map((r) => ({
         id: r.id,
         type: 'research' as const,
         title: `调研 - ${r.title}`,
-        time: r.createdAt,
+        time: r.created_at || r.date || '',
       }));
     return [...completedItems, ...journalItems, ...researchItems]
       .sort((a, b) => b.time.localeCompare(a.time))
@@ -313,7 +313,7 @@ export default function Dashboard() {
                 <div className="flex-1 min-w-0">
                   <span className="text-sm text-text-primary block truncate">{item.title}</span>
                   <span className="text-xs text-text-muted">
-                    {new Date(item.time).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
+                    {item.time ? new Date(item.time).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' }) : ''}
                   </span>
                 </div>
               </div>
