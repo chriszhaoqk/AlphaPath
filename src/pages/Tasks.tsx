@@ -1,649 +1,610 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Plus,
-  X,
-  LayoutGrid,
-  List,
-  ChevronDown,
-  ChevronUp,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Circle,
+  Trash2,
+  Pencil,
+  X,
   Maximize2,
+  Sparkles,
+  Calendar,
+  ListTodo,
+  Loader2,
 } from 'lucide-react';
+import { useTaskStore, type Quadrant, type TagType, type Task } from '@/store/useTaskStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
-import { useTaskStore, type Quadrant, type TagType } from '@/store/useTaskStore';
-import TaskItem from '@/components/TaskItem';
-import {
-  dailyChecklist,
-  weeklyChecklist,
-  monthlyChecklist,
-  quarterlyChecklist,
-} from '@/data/initialData';
 
-type ViewMode = 'matrix' | 'list';
-type StatusFilter = 'all' | 'pending' | 'completed';
-type RecurrenceType = 'none' | 'daily' | 'weekly' | 'monthly' | 'quarterly';
+const QUADRANT_CONFIG: Record<Quadrant, { label: string; color: string; desc: string }> = {
+  A: { label: 'A', color: 'bg-urgent', desc: '重要紧急' },
+  B: { label: 'B', color: 'bg-gold', desc: '重要不紧急' },
+  C: { label: 'C', color: 'bg-warning', desc: '紧急不重要' },
+  D: { label: 'D', color: 'bg-text-muted', desc: '不重要不紧急' },
+};
 
-const tagOptions: { value: TagType; label: string }[] = [
-  { value: 'industry', label: '产业' },
+const TAG_OPTIONS: { value: TagType; label: string }[] = [
+  { value: 'industry', label: '行业' },
   { value: 'macro', label: '宏观' },
   { value: 'strategy', label: '策略' },
   { value: 'quant', label: '量化' },
   { value: 'learning', label: '学习' },
   { value: 'review', label: '复盘' },
   { value: 'output', label: '输出' },
-  { value: 'network', label: '人际' },
+  { value: 'network', label: '人脉' },
 ];
 
-const quadrantMeta: Record<Quadrant, { label: string; sublabel: string; tint: string; border: string; bg: string }> = {
-  A: {
-    label: 'A',
-    sublabel: '重要+紧急',
-    tint: 'bg-urgent/8',
-    border: 'border-urgent/30',
-    bg: 'bg-urgent',
-  },
-  B: {
-    label: 'B',
-    sublabel: '重要+不紧急',
-    tint: 'bg-gold/8',
-    border: 'border-gold/30',
-    bg: 'bg-gold',
-  },
-  C: {
-    label: 'C',
-    sublabel: '不重要+紧急',
-    tint: 'bg-warning/8',
-    border: 'border-warning/30',
-    bg: 'bg-warning',
-  },
-  D: {
-    label: 'D',
-    sublabel: '不重要+不紧急',
-    tint: 'bg-text-muted/8',
-    border: 'border-text-muted/30',
-    bg: 'bg-text-muted',
-  },
-};
+const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
 
-interface AddTaskForm {
-  title: string;
-  description: string;
-  quadrant: Quadrant;
-  tags: TagType[];
-  dueDate: string;
-  recurrence: RecurrenceType;
+function formatDate(date: Date): string {
+  return date.toISOString().slice(0, 10);
 }
 
-const emptyForm: AddTaskForm = {
-  title: '',
-  description: '',
-  quadrant: 'B',
-  tags: [],
-  dueDate: new Date().toISOString().slice(0, 10),
-  recurrence: 'none',
-};
+function formatDateCN(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  return d.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
+}
+
+function isToday(dateStr: string): boolean {
+  return dateStr === formatDate(new Date());
+}
 
 export default function Tasks() {
-  const { tasks, fetchTasks, addTask, updateTask, deleteTask } = useTaskStore();
+  const { tasks, addTask, updateTask, deleteTask, saveDailySummary, getDailySummary } = useTaskStore();
 
-  const [viewMode, setViewMode] = useState<ViewMode>('matrix');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [tagFilter, setTagFilter] = useState<TagType | null>(null);
-  const [quadrantFilter, setQuadrantFilter] = useState<Quadrant | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<AddTaskForm>({ ...emptyForm });
+  // Current selected date
+  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+
+  // Add task form
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newQuadrant, setNewQuadrant] = useState<Quadrant>('B');
+  const [newTags, setNewTags] = useState<TagType[]>([]);
+
+  // Edit task
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editQuadrant, setEditQuadrant] = useState<Quadrant>('B');
+  const [editTags, setEditTags] = useState<TagType[]>([]);
+
+  // Fullscreen editor
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorValue, setEditorValue] = useState('');
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
-    daily: true,
-    weekly: false,
-    monthly: false,
-    quarterly: false,
-  });
-  const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
+  const [editorTaskId, setEditorTaskId] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchTasks();
-  }, [fetchTasks]);
+  // AI summary
+  const [aiGenerating, setAiGenerating] = useState(false);
 
-  // Statistics
-  const stats = useMemo(() => {
-    const total = tasks.length;
-    const completed = tasks.filter((t) => t.completed).length;
-    const pending = total - completed;
-    const rate = total > 0 ? Math.round((completed / total) * 100) : 0;
-    return { total, completed, pending, rate };
-  }, [tasks]);
+  // Date navigation
+  const navigateDate = (offset: number) => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    d.setDate(d.getDate() + offset);
+    setSelectedDate(formatDate(d));
+  };
 
-  // Filtered tasks for list view
-  const filteredTasks = useMemo(() => {
-    return tasks.filter((t) => {
-      if (statusFilter === 'pending' && t.completed) return false;
-      if (statusFilter === 'completed' && !t.completed) return false;
-      if (tagFilter && !t.tags.includes(tagFilter)) return false;
-      if (quadrantFilter && t.quadrant !== quadrantFilter) return false;
-      return true;
+  const goToToday = () => setSelectedDate(formatDate(new Date()));
+
+  // Week dates for the date picker
+  const weekDates = useMemo(() => {
+    const d = new Date(selectedDate + 'T00:00:00');
+    const dayOfWeek = d.getDay();
+    const monday = new Date(d);
+    monday.setDate(d.getDate() - ((dayOfWeek + 6) % 7));
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(monday);
+      date.setDate(monday.getDate() + i);
+      return formatDate(date);
     });
-  }, [tasks, statusFilter, tagFilter, quadrantFilter]);
+  }, [selectedDate]);
 
-  // Quadrant-grouped tasks for matrix view
-  const quadrantTasks = useMemo(() => {
-    const grouped: Record<Quadrant, typeof tasks> = { A: [], B: [], C: [], D: [] };
-    tasks.forEach((t) => {
-      grouped[t.quadrant].push(t);
-    });
-    return grouped;
-  }, [tasks]);
+  // Tasks for selected date
+  const dayTasks = useMemo(() => {
+    return tasks
+      .filter((t) => t.dueDate === selectedDate)
+      .sort((a, b) => {
+        // Sort: uncompleted first, then by quadrant
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        return a.quadrant.localeCompare(b.quadrant);
+      });
+  }, [tasks, selectedDate]);
 
-  const handleToggle = useCallback(
-    (id: string) => {
-      const task = tasks.find((t) => t.id === id);
-      if (task) {
-        updateTask(id, { completed: !task.completed });
-      }
-    },
-    [tasks, updateTask]
-  );
+  const completedCount = dayTasks.filter((t) => t.completed).length;
+  const totalCount = dayTasks.length;
 
-  const handleDelete = useCallback(
-    (id: string) => {
-      deleteTask(id);
-    },
-    [deleteTask]
-  );
+  // Daily summary
+  const dailySummary = getDailySummary(selectedDate);
 
+  // Add task
   const handleAddTask = async () => {
-    if (!form.title.trim()) return;
+    if (!newTitle.trim()) return;
     await addTask({
-      title: form.title.trim(),
-      description: form.description.trim() || undefined,
-      quadrant: form.quadrant,
-      tags: form.tags,
+      title: newTitle.trim(),
+      quadrant: newQuadrant,
+      tags: newTags,
       completed: false,
-      dueDate: form.dueDate || undefined,
+      dueDate: selectedDate,
     });
-    setForm({ ...emptyForm });
-    setShowModal(false);
+    setNewTitle('');
+    setNewQuadrant('B');
+    setNewTags([]);
+    setShowAddForm(false);
   };
 
-  const toggleTag = (tag: TagType) => {
-    setForm((prev) => ({
-      ...prev,
-      tags: prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag],
-    }));
+  // Toggle complete
+  const handleToggle = async (task: Task) => {
+    await updateTask(task.id, {
+      completed: !task.completed,
+      completedAt: !task.completed ? new Date().toISOString() : undefined,
+    });
   };
 
-  const toggleSection = (key: string) => {
-    setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Start edit
+  const startEdit = (task: Task) => {
+    setEditingTaskId(task.id);
+    setEditTitle(task.title);
+    setEditQuadrant(task.quadrant);
+    setEditTags([...task.tags]);
   };
 
-  const toggleChecklist = (key: string) => {
-    setChecklistState((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Save edit
+  const saveEdit = async () => {
+    if (!editingTaskId || !editTitle.trim()) return;
+    await updateTask(editingTaskId, {
+      title: editTitle.trim(),
+      quadrant: editQuadrant,
+      tags: editTags,
+    });
+    setEditingTaskId(null);
   };
 
-  const openEditor = () => {
-    setEditorValue(form.description);
+  // Open description editor
+  const openDescEditor = (task: Task) => {
+    setEditorTaskId(task.id);
+    setEditorValue(task.description || '');
     setEditorOpen(true);
   };
 
+  // AI generate summary
+  const generateAISummary = () => {
+    setAiGenerating(true);
+
+    const completedTasks = dayTasks.filter((t) => t.completed);
+    const uncompletedTasks = dayTasks.filter((t) => !t.completed);
+
+    // Build summary based on task data
+    const dateCN = formatDateCN(selectedDate);
+    const quadrantStats: Record<Quadrant, { total: number; done: number }> = {
+      A: { total: 0, done: 0 },
+      B: { total: 0, done: 0 },
+      C: { total: 0, done: 0 },
+      D: { total: 0, done: 0 },
+    };
+
+    dayTasks.forEach((t) => {
+      quadrantStats[t.quadrant].total++;
+      if (t.completed) quadrantStats[t.quadrant].done++;
+    });
+
+    const tagStats: Record<string, { total: number; done: number }> = {};
+    dayTasks.forEach((t) => {
+      t.tags.forEach((tag) => {
+        if (!tagStats[tag]) tagStats[tag] = { total: 0, done: 0 };
+        tagStats[tag].total++;
+        if (t.completed) tagStats[tag].done++;
+      });
+    });
+
+    const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    // Simulate AI generation with a delay
+    setTimeout(() => {
+      const summary = `
+<h3 style="color:#D4A853; margin-bottom:0.5em;">📋 ${dateCN} 工作总结</h3>
+
+<p style="text-indent:2em; margin-bottom:0.5em;">
+今日共安排 <strong>${totalCount}</strong> 项任务，完成 <strong>${completedCount}</strong> 项，完成率 <strong style="color:${completionRate >= 80 ? '#22C55E' : completionRate >= 50 ? '#EAB308' : '#EF4444'}">${completionRate}%</strong>。
+</p>
+
+${
+  completedTasks.length > 0
+    ? `<h4 style="margin-top:1em; margin-bottom:0.3em;">✅ 已完成任务</h4>
+<ul style="list-style:disc; padding-left:1.5em; margin-bottom:0.5em;">
+${completedTasks.map((t) => `<li>${t.title}${t.tags.length > 0 ? ` <span style="color:#9CA3AF; font-size:0.85em;">[${t.tags.map((tag) => TAG_OPTIONS.find((o) => o.value === tag)?.label || tag).join(', ')}]</span>` : ''}</li>`).join('\n')}
+</ul>`
+    : ''
+}
+
+${
+  uncompletedTasks.length > 0
+    ? `<h4 style="margin-top:1em; margin-bottom:0.3em;">⏳ 未完成任务</h4>
+<ul style="list-style:disc; padding-left:1.5em; margin-bottom:0.5em;">
+${uncompletedTasks.map((t) => `<li style="color:#EF4444;">${t.title} <span style="color:#9CA3AF; font-size:0.85em;">[${QUADRANT_CONFIG[t.quadrant].desc}]</span></li>`).join('\n')}
+</ul>`
+    : ''
+}
+
+${
+  Object.keys(tagStats).length > 0
+    ? `<h4 style="margin-top:1em; margin-bottom:0.3em;">📊 分类统计</h4>
+<p style="margin-bottom:0.3em;">
+${Object.entries(tagStats)
+  .map(([tag, stat]) => {
+    const label = TAG_OPTIONS.find((o) => o.value === tag)?.label || tag;
+    return `${label}: ${stat.done}/${stat.total}`;
+  })
+  .join(' &nbsp;|&nbsp; ')}
+</p>`
+    : ''
+}
+
+${
+  Object.values(quadrantStats).some((q) => q.total > 0)
+    ? `<h4 style="margin-top:1em; margin-bottom:0.3em;">🎯 四象限分析</h4>
+<p style="margin-bottom:0.3em;">
+${Object.entries(quadrantStats)
+  .filter(([, stat]) => stat.total > 0)
+  .map(([q, stat]) => `${QUADRANT_CONFIG[q as Quadrant].desc}: ${stat.done}/${stat.total}`)
+  .join(' &nbsp;|&nbsp; ')}
+</p>`
+    : ''
+}
+
+${
+  completionRate >= 80
+    ? `<p style="margin-top:1em; text-indent:2em; color:#22C55E;"><strong>💡 评价：</strong>今日任务完成度很高，执行力出色！继续保持节奏。</p>`
+    : completionRate >= 50
+      ? `<p style="margin-top:1em; text-indent:2em; color:#EAB308;"><strong>💡 评价：</strong>完成过半，仍有提升空间。建议聚焦重要紧急任务，合理安排优先级。</p>`
+      : totalCount > 0
+        ? `<p style="margin-top:1em; text-indent:2em; color:#EF4444;"><strong>💡 评价：</strong>今日完成率偏低，建议复盘未完成任务的原因，调整明日计划。</p>`
+        : `<p style="margin-top:1em; text-indent:2em; color:#9CA3AF;">今日暂无任务记录，建议提前规划明日工作。</p>`
+}
+`.trim();
+
+      saveDailySummary(selectedDate, summary);
+      setAiGenerating(false);
+    }, 1500);
+  };
+
+  // Toggle tag in add form
+  const toggleAddTag = (tag: TagType) => {
+    setNewTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  };
+
+  const toggleEditTag = (tag: TagType) => {
+    setEditTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  };
+
   return (
-    <div className="animate-fade-in-up space-y-4 md:space-y-6">
-      {/* Statistics bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="card p-3 md:p-4 text-center">
-          <p className="text-xs text-text-secondary mb-1">总任务数</p>
-          <p className="text-2xl font-bold text-text-primary">{stats.total}</p>
-        </div>
-        <div className="card p-3 md:p-4 text-center">
-          <p className="text-xs text-text-secondary mb-1">待办</p>
-          <p className="text-2xl font-bold text-warning">{stats.pending}</p>
-        </div>
-        <div className="card p-3 md:p-4 text-center">
-          <p className="text-xs text-text-secondary mb-1">已完成</p>
-          <p className="text-2xl font-bold text-positive">{stats.completed}</p>
-        </div>
-        <div className="card p-3 md:p-4 text-center">
-          <p className="text-xs text-text-secondary mb-1">完成率</p>
-          <p className="text-2xl font-bold text-gold">{stats.rate}%</p>
-        </div>
-      </div>
-
-      {/* View toggle + Add button */}
+    <div className="space-y-5">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <div className="flex gap-2">
-          <button
-            onClick={() => setViewMode('matrix')}
-            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'matrix'
-                ? 'bg-gold text-ink'
-                : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <LayoutGrid size={16} />
-            四象限
-          </button>
-          <button
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              viewMode === 'list'
-                ? 'bg-gold text-ink'
-                : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
-            }`}
-          >
-            <List size={16} />
-            列表
-          </button>
-        </div>
-
-        <button
-          onClick={() => setShowModal(true)}
-          className="btn-gold flex items-center gap-1.5 text-sm animate-pulse-gold"
-        >
+        <h1 className="text-2xl font-bold text-text-primary font-display">任务中心</h1>
+        <button onClick={() => setShowAddForm(true)} className="btn-gold flex items-center gap-1.5 text-sm">
           <Plus size={16} />
           添加任务
         </button>
       </div>
 
-      {/* Matrix View */}
-      {viewMode === 'matrix' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-          {(['A', 'B', 'C', 'D'] as Quadrant[]).map((q) => {
-            const meta = quadrantMeta[q];
+      {/* Date Picker */}
+      <div className="card p-3">
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={() => navigateDate(-1)} className="p-2 rounded-lg text-text-muted hover:text-gold hover:bg-gold/10 transition-colors">
+            <ChevronLeft size={20} />
+          </button>
+          <button onClick={goToToday} className="flex items-center gap-2">
+            <Calendar size={16} className="text-gold" />
+            <span className={`text-base font-semibold ${isToday(selectedDate) ? 'text-gold' : 'text-text-primary'}`}>
+              {isToday(selectedDate) ? '今天' : formatDateCN(selectedDate)}
+            </span>
+          </button>
+          <button onClick={() => navigateDate(1)} className="p-2 rounded-lg text-text-muted hover:text-gold hover:bg-gold/10 transition-colors">
+            <ChevronRight size={20} />
+          </button>
+        </div>
+
+        {/* Week strip */}
+        <div className="grid grid-cols-7 gap-1">
+          {weekDates.map((dateStr) => {
+            const d = new Date(dateStr + 'T00:00:00');
+            const dayNum = d.getDate();
+            const weekday = WEEKDAYS[d.getDay()];
+            const selected = dateStr === selectedDate;
+            const today = isToday(dateStr);
+            const dayTaskCount = tasks.filter((t) => t.dueDate === dateStr).length;
+            const dayCompleted = tasks.filter((t) => t.dueDate === dateStr && t.completed).length;
+
+            return (
+              <button
+                key={dateStr}
+                onClick={() => setSelectedDate(dateStr)}
+                className={`flex flex-col items-center py-2 rounded-xl transition-colors ${
+                  selected
+                    ? 'bg-gold/15 border border-gold/30'
+                    : today
+                      ? 'bg-[#1A1F2E] border border-border-custom'
+                      : 'hover:bg-[#1A1F2E]'
+                }`}
+              >
+                <span className={`text-[10px] ${selected ? 'text-gold' : 'text-text-muted'}`}>{weekday}</span>
+                <span className={`text-lg font-semibold ${selected ? 'text-gold' : today ? 'text-text-primary' : 'text-text-secondary'}`}>
+                  {dayNum}
+                </span>
+                {dayTaskCount > 0 && (
+                  <div className="flex items-center gap-0.5 mt-0.5">
+                    <div className={`w-1 h-1 rounded-full ${dayCompleted === dayTaskCount ? 'bg-positive' : 'bg-gold'}`} />
+                    <span className="text-[9px] text-text-muted">{dayCompleted}/{dayTaskCount}</span>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      {totalCount > 0 && (
+        <div className="card p-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <ListTodo size={16} className="text-gold" />
+              <span className="text-sm text-text-primary font-medium">
+                今日进度
+              </span>
+            </div>
+            <span className="text-sm text-text-muted">
+              {completedCount}/{totalCount} 完成
+            </span>
+          </div>
+          <div className="w-full bg-border-custom rounded-full h-2">
+            <div
+              className="h-2 rounded-full transition-all"
+              style={{
+                width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%`,
+                backgroundColor: completedCount / totalCount >= 0.8 ? '#22C55E' : completedCount / totalCount >= 0.5 ? '#EAB308' : '#D4A853',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Add Task Form */}
+      {showAddForm && (
+        <div className="card p-4 border-gold/30">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-gold">新建任务</h3>
+            <button onClick={() => setShowAddForm(false)} className="p-1 text-text-muted hover:text-text-primary">
+              <X size={16} />
+            </button>
+          </div>
+
+          <input
+            type="text"
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            placeholder="任务名称..."
+            className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold/50 mb-3"
+            autoFocus
+            onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
+          />
+
+          {/* Quadrant select */}
+          <div className="mb-3">
+            <label className="block text-xs text-text-secondary mb-1.5">优先级象限</label>
+            <div className="grid grid-cols-4 gap-2">
+              {(Object.entries(QUADRANT_CONFIG) as [Quadrant, typeof QUADRANT_CONFIG[Quadrant]][]).map(([key, cfg]) => (
+                <button
+                  key={key}
+                  onClick={() => setNewQuadrant(key)}
+                  className={`py-2 rounded-lg text-xs font-medium transition-colors ${
+                    newQuadrant === key
+                      ? `${cfg.color} text-white`
+                      : 'bg-[#1A1F2E] text-text-secondary border border-border-custom'
+                  }`}
+                >
+                  {cfg.label} {cfg.desc}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="mb-3">
+            <label className="block text-xs text-text-secondary mb-1.5">标签</label>
+            <div className="flex flex-wrap gap-1.5">
+              {TAG_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => toggleAddTag(opt.value)}
+                  className={`px-2.5 py-1 rounded-lg text-xs transition-colors ${
+                    newTags.includes(opt.value)
+                      ? 'bg-gold/15 text-gold border border-gold/30'
+                      : 'bg-[#1A1F2E] text-text-muted border border-border-custom'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button onClick={handleAddTask} disabled={!newTitle.trim()} className="btn-gold w-full py-2.5 text-sm disabled:opacity-40">
+            添加到 {formatDateCN(selectedDate)}
+          </button>
+        </div>
+      )}
+
+      {/* Task List */}
+      <div className="space-y-2">
+        {dayTasks.length === 0 ? (
+          <div className="card p-8 text-center">
+            <ListTodo size={32} className="text-text-muted mx-auto mb-3" />
+            <p className="text-text-muted text-sm">今日暂无任务</p>
+            <button onClick={() => setShowAddForm(true)} className="mt-3 text-gold text-sm hover:underline">
+              + 添加第一个任务
+            </button>
+          </div>
+        ) : (
+          dayTasks.map((task) => {
+            const isEditing = editingTaskId === task.id;
+            const quadrant = QUADRANT_CONFIG[task.quadrant];
+
             return (
               <div
-                key={q}
-                className={`card ${meta.tint} border ${meta.border} p-3 md:p-4 min-h-[200px]`}
+                key={task.id}
+                className={`card p-3 transition-all ${task.completed ? 'opacity-60' : ''}`}
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <div
-                    className={`w-7 h-7 rounded-md flex items-center justify-center text-xs font-bold text-white ${meta.bg}`}
-                  >
-                    {meta.label}
+                {isEditing ? (
+                  /* Edit mode */
+                  <div className="space-y-3">
+                    <input
+                      type="text"
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                      autoFocus
+                    />
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {(Object.entries(QUADRANT_CONFIG) as [Quadrant, typeof QUADRANT_CONFIG[Quadrant]][]).map(([key, cfg]) => (
+                        <button
+                          key={key}
+                          onClick={() => setEditQuadrant(key)}
+                          className={`py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                            editQuadrant === key
+                              ? `${cfg.color} text-white`
+                              : 'bg-[#1A1F2E] text-text-secondary border border-border-custom'
+                          }`}
+                        >
+                          {cfg.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {TAG_OPTIONS.map((opt) => (
+                        <button
+                          key={opt.value}
+                          onClick={() => toggleEditTag(opt.value)}
+                          className={`px-2 py-0.5 rounded text-xs ${
+                            editTags.includes(opt.value) ? 'bg-gold/15 text-gold' : 'bg-[#1A1F2E] text-text-muted'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={saveEdit} className="btn-gold flex-1 py-1.5 text-sm">保存</button>
+                      <button onClick={() => setEditingTaskId(null)} className="flex-1 py-1.5 text-sm border border-border-custom rounded-lg text-text-secondary">取消</button>
+                    </div>
                   </div>
-                  <span className="text-sm font-medium text-text-primary">{meta.sublabel}</span>
-                  <span className="text-xs text-text-muted ml-auto">
-                    {quadrantTasks[q].length} 项
-                  </span>
-                </div>
-
-                {quadrantTasks[q].length === 0 ? (
-                  <p className="text-xs text-text-muted text-center py-6">暂无任务</p>
                 ) : (
-                  <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
-                    {quadrantTasks[q].map((task) => (
-                      <TaskItem
-                        key={task.id}
-                        task={task}
-                        onToggle={handleToggle}
-                        onDelete={handleDelete}
-                      />
-                    ))}
+                  /* View mode */
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      {/* Quadrant badge */}
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-bold text-white ${quadrant.color} flex-shrink-0`}>
+                        {quadrant.label}
+                      </div>
+
+                      {/* Checkbox */}
+                      <button
+                        onClick={() => handleToggle(task)}
+                        className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0 ${
+                          task.completed ? 'bg-positive border-positive' : 'border-[#2A3040] hover:border-gold'
+                        }`}
+                      >
+                        {task.completed && (
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 6L5 9L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </button>
+
+                      {/* Title */}
+                      <span className={`flex-1 text-sm ${task.completed ? 'line-through text-text-muted' : 'text-text-primary'}`}>
+                        {task.title}
+                      </span>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openDescEditor(task)} className="p-1.5 text-text-muted hover:text-gold transition-colors" title="编辑详情">
+                          <Maximize2 size={14} />
+                        </button>
+                        <button onClick={() => startEdit(task)} className="p-1.5 text-text-muted hover:text-gold transition-colors" title="编辑">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => deleteTask(task.id)} className="p-1.5 text-text-muted hover:text-urgent transition-colors" title="删除">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Tags + description indicator */}
+                    {(task.tags.length > 0 || task.description) && (
+                      <div className="flex items-center gap-2 mt-1.5 ml-8">
+                        {task.tags.map((tag) => (
+                          <span key={tag} className={`tag tag-${tag} text-[10px]`}>
+                            {TAG_OPTIONS.find((o) => o.value === tag)?.label}
+                          </span>
+                        ))}
+                        {task.description && (
+                          <span className="text-[10px] text-text-muted">📝 有详情</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             );
-          })}
-        </div>
-      )}
-
-      {/* List View */}
-      {viewMode === 'list' && (
-        <div className="space-y-3 md:space-y-4">
-          {/* Status filter */}
-          <div className="flex items-center gap-2">
-            {(['all', 'pending', 'completed'] as StatusFilter[]).map((s) => {
-              const labels: Record<StatusFilter, string> = {
-                all: '全部',
-                pending: '待办',
-                completed: '已完成',
-              };
-              return (
-                <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    statusFilter === s
-                      ? 'bg-gold text-ink'
-                      : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {labels[s]}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Tag filter */}
-          <div className="flex flex-wrap gap-2">
-            {tagOptions.map((tag) => (
-              <button
-                key={tag.value}
-                onClick={() => setTagFilter(tagFilter === tag.value ? null : tag.value)}
-                className={`tag transition-all cursor-pointer ${
-                  tagFilter === tag.value ? 'ring-1 ring-gold' : ''
-                } tag-${tag.value}`}
-              >
-                {tag.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Quadrant filter */}
-          <div className="flex gap-2">
-            {(['A', 'B', 'C', 'D'] as Quadrant[]).map((q) => {
-              const meta = quadrantMeta[q];
-              return (
-                <button
-                  key={q}
-                  onClick={() => setQuadrantFilter(quadrantFilter === q ? null : q)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                    quadrantFilter === q
-                      ? `${meta.bg} text-white`
-                      : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
-                  }`}
-                >
-                  {meta.label} - {meta.sublabel}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Task list */}
-          <div className="space-y-2">
-            {filteredTasks.length === 0 ? (
-              <div className="card p-5 md:p-8 text-center">
-                <p className="text-text-secondary text-sm">没有匹配的任务</p>
-              </div>
-            ) : (
-              filteredTasks.map((task) => (
-                <TaskItem
-                  key={task.id}
-                  task={task}
-                  onToggle={handleToggle}
-                  onDelete={handleDelete}
-                />
-              ))
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 必做清单 */}
-      <div className="card p-4 md:p-6">
-        <h2 className="text-lg font-semibold text-text-primary font-display mb-3 md:mb-4">必做清单</h2>
-
-        {/* Daily */}
-        <ChecklistSection
-          title="每日必做"
-          items={dailyChecklist.map((item) => item.title)}
-          sectionKey="daily"
-          expanded={expandedSections.daily}
-          onToggle={() => toggleSection('daily')}
-          checklistState={checklistState}
-          onCheckItem={toggleChecklist}
-        />
-
-        {/* Weekly */}
-        <ChecklistSection
-          title="每周必做"
-          items={weeklyChecklist.map((item) => item.title)}
-          sectionKey="weekly"
-          expanded={expandedSections.weekly}
-          onToggle={() => toggleSection('weekly')}
-          checklistState={checklistState}
-          onCheckItem={toggleChecklist}
-        />
-
-        {/* Monthly */}
-        <ChecklistSection
-          title="每月必做"
-          items={monthlyChecklist.map((item) => item.title)}
-          sectionKey="monthly"
-          expanded={expandedSections.monthly}
-          onToggle={() => toggleSection('monthly')}
-          checklistState={checklistState}
-          onCheckItem={toggleChecklist}
-        />
-
-        {/* Quarterly */}
-        <ChecklistSection
-          title="每季度必做"
-          items={quarterlyChecklist.map((item) => item.title)}
-          sectionKey="quarterly"
-          expanded={expandedSections.quarterly}
-          onToggle={() => toggleSection('quarterly')}
-          checklistState={checklistState}
-          onCheckItem={toggleChecklist}
-        />
+          })
+        )}
       </div>
 
-      {/* Add Task Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowModal(false)} />
-          <div className="relative bg-card border border-border-custom rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto p-4 md:p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h3 className="text-lg font-semibold text-text-primary font-display">添加任务</h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-1 text-text-muted hover:text-text-primary transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-3 md:space-y-4">
-              {/* Title */}
-              <div>
-                <label className="block text-xs text-text-secondary mb-1.5">
-                  任务标题 <span className="text-urgent">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.title}
-                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                  placeholder="输入任务标题..."
-                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold transition-colors"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs text-text-secondary mb-1.5">描述</label>
-                  <button type="button" onClick={openEditor} className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors">
-                    <Maximize2 size={12} />
-                    展开
-                  </button>
-                </div>
-                <textarea
-                  value={form.description}
-                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="任务描述（可选）..."
-                  rows={3}
-                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold transition-colors resize-none"
-                />
-              </div>
-
-              {/* Quadrant selector */}
-              <div>
-                <label className="block text-xs text-text-secondary mb-1.5">象限</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['A', 'B', 'C', 'D'] as Quadrant[]).map((q) => {
-                    const meta = quadrantMeta[q];
-                    return (
-                      <button
-                        key={q}
-                        onClick={() => setForm((prev) => ({ ...prev, quadrant: q }))}
-                        className={`flex flex-col items-center gap-1 py-2 rounded-lg border text-xs font-medium transition-all ${
-                          form.quadrant === q
-                            ? `${meta.bg} text-white border-transparent`
-                            : 'bg-ink border-border-custom text-text-secondary hover:text-text-primary'
-                        }`}
-                      >
-                        <span className="text-sm font-bold">{meta.label}</span>
-                        <span className="text-[10px]">{meta.sublabel}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Tag selector */}
-              <div>
-                <label className="block text-xs text-text-secondary mb-1.5">标签（多选）</label>
-                <div className="flex flex-wrap gap-2">
-                  {tagOptions.map((tag) => (
-                    <button
-                      key={tag.value}
-                      onClick={() => toggleTag(tag.value)}
-                      className={`tag transition-all cursor-pointer ${
-                        form.tags.includes(tag.value) ? 'ring-1 ring-gold' : ''
-                      } tag-${tag.value}`}
-                    >
-                      {tag.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Due date */}
-              <div>
-                <label className="block text-xs text-text-secondary mb-1.5">截止日期</label>
-                <input
-                  type="date"
-                  value={form.dueDate}
-                  onChange={(e) => setForm((prev) => ({ ...prev, dueDate: e.target.value }))}
-                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold transition-colors"
-                />
-              </div>
-
-              {/* Recurrence */}
-              <div>
-                <label className="block text-xs text-text-secondary mb-1.5">重复</label>
-                <select
-                  value={form.recurrence}
-                  onChange={(e) =>
-                    setForm((prev) => ({
-                      ...prev,
-                      recurrence: e.target.value as RecurrenceType,
-                    }))
-                  }
-                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold transition-colors"
-                >
-                  <option value="none">不重复</option>
-                  <option value="daily">每天</option>
-                  <option value="weekly">每周</option>
-                  <option value="monthly">每月</option>
-                  <option value="quarterly">每季度</option>
-                </select>
-              </div>
-
-              {/* Save button */}
-              <button
-                onClick={handleAddTask}
-                disabled={!form.title.trim()}
-                className={`w-full py-2 md:py-2.5 rounded-lg text-sm font-semibold transition-all ${
-                  form.title.trim()
-                    ? 'btn-gold'
-                    : 'bg-border-custom text-text-muted cursor-not-allowed'
-                }`}
-              >
-                保存任务
-              </button>
-            </div>
-          </div>
+      {/* Daily Summary */}
+      <div className="card p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
+            <Sparkles size={16} className="text-gold" />
+            每日总结
+          </h2>
+          <button
+            onClick={generateAISummary}
+            disabled={aiGenerating || totalCount === 0}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs border border-gold/30 rounded-lg text-gold hover:bg-gold/10 transition-colors disabled:opacity-40"
+          >
+            {aiGenerating ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {dailySummary ? '重新生成' : 'AI 生成总结'}
+          </button>
         </div>
-      )}
-      {editorOpen && (
+
+        {aiGenerating ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 size={24} className="animate-spin text-gold" />
+            <span className="ml-3 text-sm text-text-muted">AI 正在分析今日工作...</span>
+          </div>
+        ) : dailySummary ? (
+          <div className="prose-sm" dangerouslySetInnerHTML={{ __html: dailySummary.summary }} />
+        ) : (
+          <div className="py-6 text-center text-text-muted text-sm">
+            {totalCount === 0
+              ? '添加任务后即可生成每日总结'
+              : '点击「AI 生成总结」分析今日工作情况'}
+          </div>
+        )}
+      </div>
+
+      {/* Fullscreen Editor for task description */}
+      {editorOpen && editorTaskId && (
         <FullscreenEditor
-          label="任务描述"
+          label="任务详情"
           value={editorValue}
-          onSave={(val) => {
+          onSave={async (val) => {
             setEditorValue(val);
-            setForm(prev => ({ ...prev, description: val }));
+            await updateTask(editorTaskId!, { description: val });
             setEditorOpen(false);
           }}
           onClose={() => setEditorOpen(false)}
         />
-      )}
-    </div>
-  );
-}
-
-// Checklist Section Component
-function ChecklistSection({
-  title,
-  items,
-  sectionKey,
-  expanded,
-  onToggle,
-  checklistState,
-  onCheckItem,
-}: {
-  title: string;
-  items: string[];
-  sectionKey: string;
-  expanded: boolean;
-  onToggle: () => void;
-  checklistState: Record<string, boolean>;
-  onCheckItem: (key: string) => void;
-}) {
-  const completedCount = items.filter((_, idx) => checklistState[`${sectionKey}-${idx}`]).length;
-
-  return (
-    <div className="border-b border-border-custom last:border-b-0">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between py-3 text-sm text-text-primary hover:text-gold transition-colors"
-      >
-        <div className="flex items-center gap-2">
-          {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          <span className="font-medium">{title}</span>
-          <span className="text-xs text-text-muted">
-            {completedCount}/{items.length}
-          </span>
-        </div>
-        <div className="w-20 h-1.5 bg-ink rounded-full overflow-hidden">
-          <div
-            className="h-full bg-gold rounded-full transition-all"
-            style={{ width: `${items.length > 0 ? (completedCount / items.length) * 100 : 0}%` }}
-          />
-        </div>
-      </button>
-
-      {expanded && (
-        <div className="pb-3 space-y-2">
-          {items.map((item, idx) => {
-            const itemKey = `${sectionKey}-${idx}`;
-            const checked = checklistState[itemKey] || false;
-            return (
-              <label
-                key={idx}
-                className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-ink/50 cursor-pointer transition-colors"
-              >
-                <button
-                  onClick={() => onCheckItem(itemKey)}
-                  className="flex-shrink-0"
-                >
-                  {checked ? (
-                    <CheckCircle2 size={16} className="text-positive" />
-                  ) : (
-                    <Circle size={16} className="text-text-muted" />
-                  )}
-                </button>
-                <span
-                  className={`text-sm ${
-                    checked ? 'line-through text-text-muted' : 'text-text-secondary'
-                  }`}
-                >
-                  {item}
-                </span>
-              </label>
-            );
-          })}
-        </div>
       )}
     </div>
   );

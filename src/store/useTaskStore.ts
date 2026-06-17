@@ -11,39 +11,43 @@ export interface Task {
   quadrant: Quadrant;
   tags: TagType[];
   completed: boolean;
-  dueDate?: string;
+  dueDate: string; // 日期 YYYY-MM-DD，作为任务归属日期
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface DailySummary {
+  date: string; // YYYY-MM-DD
+  summary: string; // AI 生成的总结（HTML）
+  generatedAt: string;
 }
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
 interface TaskState {
   tasks: Task[];
+  dailySummaries: DailySummary[];
   loading: boolean;
   error: string | null;
   fetchTasks: () => Promise<void>;
   addTask: (task: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   updateTask: (id: string, updates: Partial<Task>) => Promise<void>;
   deleteTask: (id: string) => Promise<void>;
-  getTodayTasks: () => Task[];
-  getCompletedToday: () => Task[];
-  getByQuadrant: (quadrant: Quadrant) => Task[];
-  getByTag: (tag: TagType) => Task[];
-  getFiltered: (filters: { quadrant?: Quadrant; tag?: TagType; completed?: boolean }) => Task[];
+  saveDailySummary: (date: string, summary: string) => void;
+  getDailySummary: (date: string) => DailySummary | undefined;
+  getTasksByDate: (date: string) => Task[];
 }
 
 export const useTaskStore = create<TaskState>()(
   persist(
     (set, get) => ({
       tasks: [],
+      dailySummaries: [],
       loading: false,
       error: null,
 
-      fetchTasks: async () => {
-        // Data is already in state from persist, no-op
-      },
+      fetchTasks: async () => {},
 
       addTask: async (task) => {
         const now = new Date().toISOString();
@@ -68,31 +72,29 @@ export const useTaskStore = create<TaskState>()(
         set((state) => ({ tasks: state.tasks.filter((t) => t.id !== id) }));
       },
 
-      getTodayTasks: () => {
-        const today = new Date().toISOString().slice(0, 10);
-        return get().tasks.filter((t) => t.dueDate?.slice(0, 10) === today);
-      },
-
-      getCompletedToday: () => {
-        const today = new Date().toISOString().slice(0, 10);
-        return get().tasks.filter((t) => t.completedAt?.slice(0, 10) === today && t.completed);
-      },
-
-      getByQuadrant: (quadrant) => {
-        return get().tasks.filter((t) => t.quadrant === quadrant);
-      },
-
-      getByTag: (tag) => {
-        return get().tasks.filter((t) => t.tags.includes(tag));
-      },
-
-      getFiltered: (filters) => {
-        return get().tasks.filter((t) => {
-          if (filters.quadrant && t.quadrant !== filters.quadrant) return false;
-          if (filters.tag && !t.tags.includes(filters.tag)) return false;
-          if (filters.completed !== undefined && t.completed !== filters.completed) return false;
-          return true;
+      saveDailySummary: (date, summary) => {
+        set((state) => {
+          const existing = state.dailySummaries.findIndex((s) => s.date === date);
+          const entry: DailySummary = {
+            date,
+            summary,
+            generatedAt: new Date().toISOString(),
+          };
+          if (existing >= 0) {
+            const updated = [...state.dailySummaries];
+            updated[existing] = entry;
+            return { dailySummaries: updated };
+          }
+          return { dailySummaries: [...state.dailySummaries, entry] };
         });
+      },
+
+      getDailySummary: (date) => {
+        return get().dailySummaries.find((s) => s.date === date);
+      },
+
+      getTasksByDate: (date) => {
+        return get().tasks.filter((t) => t.dueDate === date);
       },
     }),
     {
