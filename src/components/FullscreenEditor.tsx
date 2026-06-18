@@ -21,6 +21,7 @@ import {
   Download,
   XCircle,
   Mic,
+  GripVertical,
 } from 'lucide-react';
 import { useAttachmentStore, generateAttachmentSummary, type Attachment } from '@/store/useAttachmentStore';
 import VoiceInput, { isVoiceSupported } from '@/components/VoiceInput';
@@ -50,6 +51,40 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fontSize, setFontSize] = useState(14);
   const [wordCount, setWordCount] = useState(0);
+
+  // 悬浮窗拖拽状态
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
+
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    // 只通过拖拽手柄触发
+    if ((e.target as HTMLElement).closest('[data-drag-handle]')) {
+      setIsDragging(true);
+      dragStart.current = {
+        x: e.clientX,
+        y: e.clientY,
+        posX: position.x,
+        posY: position.y,
+      };
+    }
+  }, [position]);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    const handleMove = (e: MouseEvent) => {
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPosition({ x: dragStart.current.posX + dx, y: dragStart.current.posY + dy });
+    };
+    const handleUp = () => setIsDragging(false);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+    };
+  }, [isDragging]);
 
   // Attachments
   const { getAttachments, addAttachment, removeAttachment, updateAttachmentSummary } = useAttachmentStore();
@@ -200,11 +235,23 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-[92vw] max-w-4xl h-[88vh] bg-ink border border-border-custom rounded-xl flex flex-col shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-custom flex-shrink-0">
-          <h3 className="text-base font-semibold text-text-primary font-display">{label}</h3>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={handleDragStart}>
+      <div
+        className="w-[92vw] max-w-4xl h-[88vh] bg-ink border border-border-custom rounded-xl flex flex-col shadow-2xl"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px)`,
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+        }}
+      >
+        {/* Header - draggable */}
+        <div
+          data-drag-handle
+          className="flex items-center justify-between px-4 py-2.5 border-b border-border-custom flex-shrink-0 cursor-move select-none"
+        >
+          <div className="flex items-center gap-2">
+            <GripVertical size={16} className="text-text-muted" />
+            <h3 className="text-base font-semibold text-text-primary font-display">{label}</h3>
+          </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-text-muted">{wordCount} 字</span>
             {attachments.length > 0 && (

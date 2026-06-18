@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
-import { Book, GraduationCap, FileText, BarChart, Plus, Pencil, Trash2, X, Maximize2 } from 'lucide-react';
+import { Book, GraduationCap, FileText, BarChart, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { useLearningStore, type Learning } from '@/store/useLearningStore';
-import FullscreenEditor from '@/components/FullscreenEditor';
+import VoiceTextInput from '@/components/VoiceTextInput';
 
 type LearningType = 'book' | 'course' | 'paper' | 'report';
 type FilterTab = 'all' | LearningType;
@@ -44,8 +44,6 @@ export default function LearningPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<LearningFormData>(emptyForm);
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorValue, setEditorValue] = useState('');
 
   useEffect(() => {
     fetchLearnings();
@@ -79,11 +77,6 @@ export default function LearningPage() {
     });
     return dist;
   }, [learnings]);
-
-  const openEditor = () => {
-    setEditorValue(form.notes);
-    setEditorOpen(true);
-  };
 
   const openAddModal = () => {
     setEditingId(null);
@@ -350,19 +343,15 @@ export default function LearningPage() {
 
               {/* Notes */}
               <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs text-text-secondary">笔记</label>
-                  <button type="button" onClick={openEditor} className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors">
-                    <Maximize2 size={12} />
-                    展开
-                  </button>
-                </div>
-                <textarea
+                <label className="block text-xs text-text-secondary mb-1.5">笔记</label>
+                <VoiceTextInput
                   value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-none"
-                  rows={3}
-                  placeholder="学习笔记..."
+                  onChange={(v) => setForm({ ...form, notes: v })}
+                  placeholder="学习笔记，点击右上角🎙语音输入或⛶全屏富文本编辑..."
+                  multiline
+                  rows={4}
+                  supportRichText
+                  parentId={editingId ? `learning-${editingId}` : 'learning-new'}
                 />
               </div>
 
@@ -388,20 +377,6 @@ export default function LearningPage() {
             </div>
           </div>
         </div>
-      )}
-
-      {editorOpen && (
-        <FullscreenEditor
-          parentId={editingId ? `learning-${editingId}` : `learning-new`}
-          label="学习笔记"
-          value={editorValue}
-          onSave={(val) => {
-            setEditorValue(val);
-            setForm(prev => ({ ...prev, notes: val }));
-            setEditorOpen(false);
-          }}
-          onClose={() => setEditorOpen(false)}
-        />
       )}
     </div>
   );
