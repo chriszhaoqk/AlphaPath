@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
@@ -24,24 +24,28 @@ import { useIndustryStore } from '@/store/useIndustryStore';
 import RadarChart from '@/components/RadarChart';
 import ProgressRing from '@/components/ProgressRing';
 
+// 获取本地时区的日期字符串 YYYY-MM-DD（避免 toISOString 的 UTC 偏移问题）
+function getLocalDateString(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 function getStreakCount(completedDates: string[]): number {
   if (completedDates.length === 0) return 0;
   const sorted = [...completedDates].sort((a, b) => b.localeCompare(a));
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getLocalDateString(new Date());
   let streak = 0;
-  let checkDate = new Date(today);
+  let checkDate = new Date();
   if (!sorted.includes(today)) {
-    const d = new Date(checkDate);
-    d.setDate(d.getDate() - 1);
-    checkDate = d;
+    checkDate.setDate(checkDate.getDate() - 1);
   }
   for (let i = 0; i < 365; i++) {
-    const dateStr = checkDate.toISOString().slice(0, 10);
+    const dateStr = getLocalDateString(checkDate);
     if (sorted.includes(dateStr)) {
       streak++;
-      const d = new Date(checkDate);
-      d.setDate(d.getDate() - 1);
-      checkDate = d;
+      checkDate.setDate(checkDate.getDate() - 1);
     } else {
       break;
     }
@@ -79,29 +83,42 @@ export default function Dashboard() {
   const { researches, fetchResearches } = useIndustryStore();
   const [lastSync, setLastSync] = useState<Date>(new Date());
 
-  useEffect(() => {
-    const load = async () => {
-      await Promise.all([fetchTasks(), fetchGoals(), fetchAssessments(), fetchJournals(), fetchResearches()]);
-      setLastSync(new Date());
-    };
-    load();
+  const refreshData = useCallback(async () => {
+    await Promise.all([fetchTasks(), fetchGoals(), fetchAssessments(), fetchJournals(), fetchResearches()]);
+    setLastSync(new Date());
   }, [fetchTasks, fetchGoals, fetchAssessments, fetchJournals, fetchResearches]);
 
+  useEffect(() => {
+    refreshData();
+    // 页面重新可见时刷新数据
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        refreshData();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshData]);
+
   const todayTasks = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return tasks.filter((t) => t.dueDate?.slice(0, 10) === today);
+    const today = getLocalDateString(new Date());
+    return tasks.filter((t) => t.dueDate === today);
   }, [tasks]);
 
   const completedToday = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return tasks.filter((t) => t.completedAt?.slice(0, 10) === today && t.completed);
+    const today = getLocalDateString(new Date());
+    return tasks.filter((t) => {
+      if (!t.completed || !t.completedAt) return false;
+      // completedAt 是 ISO 字符串，需要转换为本地日期比较
+      return getLocalDateString(new Date(t.completedAt)) === today;
+    });
   }, [tasks]);
   const todayUncompleted = useMemo(() => todayTasks.filter((t) => !t.completed), [todayTasks]);
 
   const streak = useMemo(() => {
     const completedDates = tasks
       .filter((t) => t.completed && t.completedAt)
-      .map((t) => t.completedAt!.slice(0, 10));
+      .map((t) => getLocalDateString(new Date(t.completedAt!)));
     const uniqueDates = [...new Set(completedDates)];
     return getStreakCount(uniqueDates);
   }, [tasks]);
