@@ -14,8 +14,8 @@ export interface Attachment {
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
 
-// Max file size: 5MB
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+// Max file size: 100MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024;
 
 interface AttachmentState {
   attachments: Record<string, Attachment[]>; // key: parentId (e.g. "industry-abc123")
@@ -36,7 +36,7 @@ export const useAttachmentStore = create<AttachmentState>()(
 
       addAttachment: async (parentId: string, file: File): Promise<Attachment> => {
         if (file.size > MAX_FILE_SIZE) {
-          throw new Error(`文件大小不能超过 5MB（当前: ${(file.size / 1024 / 1024).toFixed(1)}MB）`);
+          throw new Error(`文件大小不能超过 100MB（当前: ${(file.size / 1024 / 1024).toFixed(1)}MB）`);
         }
 
         return new Promise((resolve, reject) => {

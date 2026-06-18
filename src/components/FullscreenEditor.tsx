@@ -434,7 +434,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
         {/* Footer hint */}
         <div className="px-4 py-1.5 border-t border-border-custom text-xs text-text-muted flex justify-between flex-shrink-0">
           <span>选中文本后可设置格式{parentId ? ' | 点击📎上传附件' : ''}</span>
-          <span>附件限5MB以内</span>
+          <span>附件限100MB以内</span>
         </div>
       </div>
 
