@@ -726,6 +726,7 @@ ${
       {/* Fullscreen Editor for task description */}
       {editorOpen && editorTaskId && (
         <FullscreenEditor
+          parentId={`task-${editorTaskId}`}
           label="任务详情"
           value={editorValue}
           onSave={async (val) => {

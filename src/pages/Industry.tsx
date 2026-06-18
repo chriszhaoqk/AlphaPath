@@ -610,6 +610,7 @@ export default function IndustryPage() {
       {/* Fullscreen Editor Modal */}
       {editorOpen && (
         <FullscreenEditor
+          parentId={editingId ? `industry-${editingId}-${editorField}` : `industry-new-${editorField}`}
           label={FIELD_LABELS[editorField]}
           value={editorValue}
           onSave={(val) => {

@@ -460,6 +460,7 @@ export default function JournalPage() {
 
       {editorOpen && (
         <FullscreenEditor
+          parentId={editingId ? `journal-${editingId}-${editorField}` : `journal-new-${editorField}`}
           label={FIELD_LABELS[editorField]}
           value={editorValue}
           onSave={(val) => {

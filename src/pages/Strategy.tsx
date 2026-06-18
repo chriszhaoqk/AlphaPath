@@ -182,6 +182,7 @@ function StrategyCard({
       </div>
       {editorOpen && (
         <FullscreenEditor
+          parentId={`strategy-${strategy?.id || 'new'}-${editorField}`}
           label={template.fields.find(f => f.key === editorField)?.label || '编辑'}
           value={editorValue}
           onSave={(val) => {

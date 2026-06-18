@@ -392,6 +392,7 @@ export default function LearningPage() {
 
       {editorOpen && (
         <FullscreenEditor
+          parentId={editingId ? `learning-${editingId}` : `learning-new`}
           label="学习笔记"
           value={editorValue}
           onSave={(val) => {
