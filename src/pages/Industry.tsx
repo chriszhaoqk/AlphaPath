@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
-import { FileText, Plus, PenLine, Trash2, X, ChevronRight, CheckCircle2, Circle, Tag, Maximize2 } from 'lucide-react';
+import { FileText, Plus, PenLine, Trash2, X, ChevronRight, CheckCircle2, Circle, Tag } from 'lucide-react';
 import { useIndustryStore, type IndustryResearch } from '@/store/useIndustryStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
+import VoiceTextInput from '@/components/VoiceTextInput';
 
 type ViewTab = 'list' | 'write';
 
@@ -40,6 +41,7 @@ export default function IndustryPage() {
 
   const [activeTab, setActiveTab] = useState<ViewTab>('list');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftId, setDraftId] = useState<string>(() => 'draft-' + Date.now().toString(36));
   const [form, setForm] = useState<ResearchFormData>(emptyForm);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [filterIndustry, setFilterIndustry] = useState<string>('all');
@@ -50,6 +52,9 @@ export default function IndustryPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorField, setEditorField] = useState<keyof Pick<ResearchFormData, 'summary' | 'keyFindings' | 'investmentImplications'>>('summary');
   const [editorValue, setEditorValue] = useState('');
+
+  // Current attachment parent ID (use editingId if editing, otherwise draftId for new)
+  const currentParentId = editingId ? `industry-${editingId}` : `industry-${draftId}`;
 
   const openEditor = useCallback((field: keyof Pick<ResearchFormData, 'summary' | 'keyFindings' | 'investmentImplications'>) => {
     setEditorField(field);
@@ -97,6 +102,7 @@ export default function IndustryPage() {
       });
     } else {
       setEditingId(null);
+      setDraftId('draft-' + Date.now().toString(36));
       setForm({ ...emptyForm });
     }
     setActiveTab('write');
@@ -423,11 +429,9 @@ export default function IndustryPage() {
           {/* Title */}
           <div>
             <label className="block text-xs text-text-secondary mb-1.5">标题 *</label>
-            <input
-              type="text"
+            <VoiceTextInput
               value={form.title}
-              onChange={(e) => setForm({ ...form, title: e.target.value })}
-              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+              onChange={(v) => setForm({ ...form, title: v })}
               placeholder="输入调研纪要标题..."
             />
           </div>
@@ -439,7 +443,7 @@ export default function IndustryPage() {
               <select
                 value={form.industry}
                 onChange={(e) => setForm({ ...form, industry: e.target.value })}
-                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 min-h-[48px]"
               >
                 {INDUSTRY_OPTIONS.map((i) => (
                   <option key={i} value={i}>{i}</option>
@@ -448,11 +452,9 @@ export default function IndustryPage() {
             </div>
             <div>
               <label className="block text-xs text-text-secondary mb-1.5">细分领域</label>
-              <input
-                type="text"
+              <VoiceTextInput
                 value={form.subIndustry}
-                onChange={(e) => setForm({ ...form, subIndustry: e.target.value })}
-                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                onChange={(v) => setForm({ ...form, subIndustry: v })}
                 placeholder="如：半导体设备"
               />
             </div>
@@ -466,16 +468,14 @@ export default function IndustryPage() {
                 type="date"
                 value={form.date}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 min-h-[48px]"
               />
             </div>
             <div>
               <label className="block text-xs text-text-secondary mb-1.5">参与人员</label>
-              <input
-                type="text"
+              <VoiceTextInput
                 value={form.participants}
-                onChange={(e) => setForm({ ...form, participants: e.target.value })}
-                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                onChange={(v) => setForm({ ...form, participants: v })}
                 placeholder="如：张三、李四"
               />
             </div>
@@ -483,67 +483,43 @@ export default function IndustryPage() {
 
           {/* Summary */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs text-text-secondary">会议摘要</label>
-              <button
-                type="button"
-                onClick={() => openEditor('summary')}
-                className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors"
-              >
-                <Maximize2 size={12} />
-                展开
-              </button>
-            </div>
-            <textarea
+            <label className="block text-xs text-text-secondary mb-1.5">会议摘要</label>
+            <VoiceTextInput
               value={form.summary}
-              onChange={(e) => setForm({ ...form, summary: e.target.value })}
-              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-y min-h-[80px]"
-              rows={5}
+              onChange={(v) => setForm({ ...form, summary: v })}
               placeholder="记录会议的主要内容和背景..."
+              multiline
+              rows={5}
+              supportRichText
+              parentId={currentParentId}
             />
           </div>
 
           {/* Key findings */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs text-text-secondary">核心发现 *</label>
-              <button
-                type="button"
-                onClick={() => openEditor('keyFindings')}
-                className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors"
-              >
-                <Maximize2 size={12} />
-                展开
-              </button>
-            </div>
-            <textarea
+            <label className="block text-xs text-text-secondary mb-1.5">核心发现 *</label>
+            <VoiceTextInput
               value={form.keyFindings}
-              onChange={(e) => setForm({ ...form, keyFindings: e.target.value })}
-              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-y min-h-[100px]"
-              rows={6}
+              onChange={(v) => setForm({ ...form, keyFindings: v })}
               placeholder="记录调研中的关键发现和数据..."
+              multiline
+              rows={6}
+              supportRichText
+              parentId={`${currentParentId}-kf`}
             />
           </div>
 
           {/* Investment implications */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs text-text-secondary">投资启示</label>
-              <button
-                type="button"
-                onClick={() => openEditor('investmentImplications')}
-                className="flex items-center gap-1 text-xs text-text-muted hover:text-gold transition-colors"
-              >
-                <Maximize2 size={12} />
-                展开
-              </button>
-            </div>
-            <textarea
+            <label className="block text-xs text-text-secondary mb-1.5">投资启示</label>
+            <VoiceTextInput
               value={form.investmentImplications}
-              onChange={(e) => setForm({ ...form, investmentImplications: e.target.value })}
-              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-gold/50 resize-y min-h-[80px]"
-              rows={5}
+              onChange={(v) => setForm({ ...form, investmentImplications: v })}
               placeholder="分析调研结果对投资决策的影响..."
+              multiline
+              rows={5}
+              supportRichText
+              parentId={`${currentParentId}-ii`}
             />
           </div>
 

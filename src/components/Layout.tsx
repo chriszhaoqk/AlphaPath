@@ -12,10 +12,9 @@ export default function Layout() {
       </aside>
 
       {/* Main content */}
-      {/* mobile: top padding for header bar (h-14=56px) + bottom padding for tab bar (h-16=64px) */}
-      {/* desktop: left margin for sidebar */}
-      <main className="flex-1 md:ml-[240px] pt-14 pb-20 md:pt-0 md:pb-0">
-        <div className="max-w-6xl mx-auto px-4 py-5 md:px-6 md:py-6">
+      {/* mobile: top padding for header bar + bottom padding for tab bar */}
+      <main className="flex-1 md:ml-[240px] pt-[72px] pb-[96px] md:pt-0 md:pb-0">
+        <div className="max-w-6xl mx-auto px-4 py-4 md:px-6 md:py-6">
           <Outlet />
         </div>
       </main>

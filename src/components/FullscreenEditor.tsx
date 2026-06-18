@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import {
   X,
   Bold,
@@ -20,8 +20,10 @@ import {
   Loader2,
   Download,
   XCircle,
+  Mic,
 } from 'lucide-react';
 import { useAttachmentStore, generateAttachmentSummary, type Attachment } from '@/store/useAttachmentStore';
+import VoiceInput, { isVoiceSupported } from '@/components/VoiceInput';
 
 interface FullscreenEditorProps {
   label: string;
@@ -60,6 +62,15 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
 
   // AI summary
   const [summarizingId, setSummarizingId] = useState<string | null>(null);
+
+  // Voice input handler
+  const handleVoiceInput = useCallback((text: string) => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+      document.execCommand('insertText', false, text);
+      updateWordCount();
+    }
+  }, []);
 
   useEffect(() => {
     if (editorRef.current) {
@@ -263,6 +274,13 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
             <option value="h4">标题4</option>
             <option value="blockquote">引用</option>
           </select>
+
+          {/* Voice input button */}
+          <div className="w-px h-5 bg-border-custom mx-1.5" />
+          <VoiceInput
+            onTextReceived={handleVoiceInput}
+            buttonSize="sm"
+          />
 
           {/* File upload button */}
           {parentId && (

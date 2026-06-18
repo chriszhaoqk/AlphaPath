@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { useTaskStore, type Quadrant, type TagType, type Task } from '@/store/useTaskStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
+import VoiceTextInput from '@/components/VoiceTextInput';
 
 const QUADRANT_CONFIG: Record<Quadrant, { label: string; color: string; desc: string }> = {
   A: { label: 'A', color: 'bg-urgent', desc: '重要紧急' },
@@ -477,15 +478,14 @@ ${
             </button>
           </div>
 
-          <input
-            type="text"
-            value={newTitle}
-            onChange={(e) => setNewTitle(e.target.value)}
-            placeholder="任务名称..."
-            className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary placeholder-text-muted focus:outline-none focus:border-gold/50 mb-3"
-            autoFocus
-            onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-          />
+          <div className="mb-3">
+            <label className="block text-xs text-text-secondary mb-1.5">任务名称 *</label>
+            <VoiceTextInput
+              value={newTitle}
+              onChange={setNewTitle}
+              placeholder="输入任务名称，或点右侧🎙语音输入..."
+            />
+          </div>
 
           {/* Quadrant select */}
           <div className="mb-3">

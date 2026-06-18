@@ -106,95 +106,110 @@ body {
 /* Mobile-first: large fonts and touch targets for native app feel */
 @media (max-width: 768px) {
   html {
-    font-size: 20px !important;
+    font-size: 18px !important;
     -webkit-text-size-adjust: 100% !important;
   }
 
   body {
-    font-size: 18px !important;
+    font-size: 16px !important;
     line-height: 1.7 !important;
+    padding-bottom: 80px;
   }
 
   /* Force all text inside cards to be readable */
   .card p, .card span, .card label, .card li, .card td, .card th, .card dd, .card dt {
-    font-size: 17px !important;
+    font-size: 15px !important;
     line-height: 1.6 !important;
   }
 
   /* Force heading sizes */
   h1 {
-    font-size: 28px !important;
+    font-size: 24px !important;
+    line-height: 1.3 !important;
   }
 
   h2 {
-    font-size: 22px !important;
+    font-size: 20px !important;
+    line-height: 1.35 !important;
   }
 
   h3 {
-    font-size: 20px !important;
+    font-size: 18px !important;
+    line-height: 1.4 !important;
   }
 
   /* Force utility text sizes */
   .text-sm {
-    font-size: 17px !important;
-  }
-
-  .text-xs {
     font-size: 15px !important;
   }
 
-  /* Force large display text sizes */
-  .text-3xl {
-    font-size: 2.5rem !important;
-  }
-
-  .text-2xl {
-    font-size: 2rem !important;
+  .text-xs {
+    font-size: 13px !important;
   }
 
   /* Force button touch targets */
   button, a, [role="button"] {
-    min-height: 52px !important;
-    min-width: 52px !important;
+    min-height: 48px !important;
+    min-width: 48px !important;
   }
 
   /* Force input touch targets - 17px prevents iOS zoom */
   input, select, textarea {
-    min-height: 56px !important;
+    min-height: 52px !important;
     font-size: 17px !important;
+  }
+
+  textarea {
+    min-height: 96px !important;
+    line-height: 1.6 !important;
   }
 
   /* Force gold button sizing */
   .btn-gold {
-    padding: 16px 32px !important;
-    font-size: 18px !important;
+    padding: 14px 28px !important;
+    font-size: 16px !important;
     border-radius: 14px !important;
+    min-height: 52px !important;
   }
 
   /* Force tag sizing */
   .tag {
-    padding: 8px 20px !important;
-    font-size: 15px !important;
+    padding: 6px 14px !important;
+    font-size: 13px !important;
+    border-radius: 999px !important;
   }
 
-  /* Force card sizing */
+  /* Force card sizing - bigger padding, bigger radius */
   .card {
-    padding: 20px !important;
+    padding: 18px !important;
     border-radius: 16px !important;
+    margin-bottom: 12px !important;
   }
 
   /* Force grid gaps */
   .grid {
-    gap: 16px !important;
+    gap: 14px !important;
   }
 
   /* Force section spacing */
   .space-y-4 > * + * {
+    margin-top: 18px !important;
+  }
+
+  .space-y-5 > * + * {
     margin-top: 20px !important;
   }
 
   .space-y-6 > * + * {
-    margin-top: 20px !important;
+    margin-top: 24px !important;
+  }
+
+  .space-y-3 > * + * {
+    margin-top: 14px !important;
+  }
+
+  .space-y-2 > * + * {
+    margin-top: 10px !important;
   }
 
   /* Checkbox and radio inputs - easy tapping */
@@ -209,6 +224,29 @@ body {
   progress, input[type="range"] {
     min-height: 8px !important;
     height: 8px !important;
+  }
+
+  /* Form labels */
+  label {
+    font-size: 14px !important;
+    margin-bottom: 8px !important;
+  }
+
+  /* Tabs / pill buttons */
+  select {
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  /* Sidebar / nav bottom spacing extra */
+  header.fixed + * {
+    padding-top: 80px !important;
+  }
+
+  /* Voice text input - room for the icon button */
+  .voice-wrap input,
+  .voice-wrap textarea {
+    padding-right: 60px !important;
   }
 }
 
