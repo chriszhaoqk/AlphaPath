@@ -15,6 +15,7 @@ import {
   Play,
   Pause,
   Clock,
+  Keyboard,
 } from 'lucide-react';
 import { useTaskStore, type Quadrant, type TagType, type Task } from '@/store/useTaskStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
@@ -114,6 +115,11 @@ export default function Tasks() {
 
   // AI summary
   const [aiGenerating, setAiGenerating] = useState(false);
+
+  // Manual time input
+  const [timeInputTaskId, setTimeInputTaskId] = useState<string | null>(null);
+  const [timeInputHours, setTimeInputHours] = useState('');
+  const [timeInputMinutes, setTimeInputMinutes] = useState('');
 
   // Timer tick - force re-render every second for active timers
   const [, setTimerTick] = useState(0);
@@ -219,6 +225,37 @@ export default function Tasks() {
         timerStartedAt: new Date().toISOString(),
       });
     }
+  };
+
+  // Open manual time input
+  const openTimeInput = (task: Task) => {
+    setTimeInputTaskId(task.id);
+    const existingHours = Math.floor((task.timeSpent || 0) / 3600);
+    const existingMinutes = Math.floor(((task.timeSpent || 0) % 3600) / 60);
+    setTimeInputHours(String(existingHours));
+    setTimeInputMinutes(String(existingMinutes));
+  };
+
+  // Save manual time
+  const saveTimeInput = async () => {
+    if (!timeInputTaskId) return;
+    const hours = parseInt(timeInputHours) || 0;
+    const minutes = parseInt(timeInputMinutes) || 0;
+    const totalSeconds = hours * 3600 + minutes * 60;
+    const task = tasks.find((t) => t.id === timeInputTaskId);
+    // 如果计时器正在运行，先停止并累加
+    let additionalTime = 0;
+    if (task?.timerStartedAt) {
+      const started = new Date(task.timerStartedAt).getTime();
+      additionalTime = Math.floor((Date.now() - started) / 1000);
+    }
+    await updateTask(timeInputTaskId, {
+      timeSpent: totalSeconds + additionalTime,
+      timerStartedAt: undefined,
+    });
+    setTimeInputTaskId(null);
+    setTimeInputHours('');
+    setTimeInputMinutes('');
   };
 
   // Start edit
@@ -646,6 +683,16 @@ ${
                         <span>{formatDuration(liveTime)}</span>
                       </button>
 
+                      {/* Manual time input */}
+                      <button
+                        onClick={() => openTimeInput(task)}
+                        disabled={task.completed}
+                        className={`p-1.5 rounded-lg text-text-muted hover:text-gold hover:bg-gold/10 transition-colors flex-shrink-0 ${task.completed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title="手动录入时间"
+                      >
+                        <Keyboard size={14} />
+                      </button>
+
                       {/* Actions */}
                       <div className="flex items-center gap-0.5">
                         <button onClick={() => openDescEditor(task)} className="p-1.5 text-text-muted hover:text-gold transition-colors" title="编辑详情">
@@ -739,6 +786,84 @@ ${
           }}
           onClose={() => setEditorOpen(false)}
         />
+      )}
+
+      {/* Manual time input modal */}
+      {timeInputTaskId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setTimeInputTaskId(null)}>
+          <div className="card p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                <Keyboard size={18} className="text-gold" />
+                手动录入时间
+              </h3>
+              <button onClick={() => setTimeInputTaskId(null)} className="text-text-muted hover:text-text-primary">
+                <X size={18} />
+              </button>
+            </div>
+
+            <p className="text-xs text-text-muted mb-4">
+              {(() => {
+                const task = tasks.find((t) => t.id === timeInputTaskId);
+                return task ? `任务：${task.title}` : '';
+              })()}
+            </p>
+
+            <div className="flex items-end gap-3 mb-4">
+              <div className="flex-1">
+                <label className="block text-xs text-text-secondary mb-1.5">小时</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="24"
+                  value={timeInputHours}
+                  onChange={(e) => setTimeInputHours(e.target.value)}
+                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-center text-lg text-text-primary focus:outline-none focus:border-gold/50"
+                  placeholder="0"
+                  autoFocus
+                />
+              </div>
+              <span className="text-text-muted pb-3">:</span>
+              <div className="flex-1">
+                <label className="block text-xs text-text-secondary mb-1.5">分钟</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={timeInputMinutes}
+                  onChange={(e) => setTimeInputMinutes(e.target.value)}
+                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-center text-lg text-text-primary focus:outline-none focus:border-gold/50"
+                  placeholder="0"
+                />
+              </div>
+            </div>
+
+            {/* Quick presets */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {[15, 30, 60, 90, 120].map((mins) => (
+                <button
+                  key={mins}
+                  onClick={() => {
+                    setTimeInputHours(String(Math.floor(mins / 60)));
+                    setTimeInputMinutes(String(mins % 60));
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs bg-[#1A1F2E] text-text-secondary border border-border-custom hover:text-gold hover:border-gold/30 transition-colors"
+                >
+                  {mins < 60 ? `${mins}分钟` : `${mins / 60}小时`}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={saveTimeInput} className="btn-gold flex-1 py-2.5 text-sm">
+                保存
+              </button>
+              <button onClick={() => setTimeInputTaskId(null)} className="flex-1 py-2.5 text-sm border border-border-custom rounded-lg text-text-secondary">
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
