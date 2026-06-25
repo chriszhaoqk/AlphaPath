@@ -16,8 +16,15 @@ import {
   Pause,
   Clock,
   Keyboard,
+  Share2,
+  Building2,
+  BookOpen,
+  PenLine,
 } from 'lucide-react';
 import { useTaskStore, type Quadrant, type TagType, type Task } from '@/store/useTaskStore';
+import { useIndustryStore } from '@/store/useIndustryStore';
+import { useLearningStore } from '@/store/useLearningStore';
+import { useJournalStore } from '@/store/useJournalStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
 import VoiceTextInput from '@/components/VoiceTextInput';
 
@@ -92,6 +99,9 @@ function getLiveTimeSpent(task: Task): number {
 
 export default function Tasks() {
   const { tasks, addTask, updateTask, deleteTask, saveDailySummary, getDailySummary } = useTaskStore();
+  const { addResearch } = useIndustryStore();
+  const { addLearning } = useLearningStore();
+  const { addJournal } = useJournalStore();
 
   // Current selected date
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
@@ -120,6 +130,10 @@ export default function Tasks() {
   const [timeInputTaskId, setTimeInputTaskId] = useState<string | null>(null);
   const [timeInputHours, setTimeInputHours] = useState('');
   const [timeInputMinutes, setTimeInputMinutes] = useState('');
+
+  // Share task
+  const [shareTaskId, setShareTaskId] = useState<string | null>(null);
+  const [shareSuccess, setShareSuccess] = useState('');
 
   // Timer tick - force re-render every second for active timers
   const [, setTimerTick] = useState(0);
@@ -256,6 +270,49 @@ export default function Tasks() {
     setTimeInputTaskId(null);
     setTimeInputHours('');
     setTimeInputMinutes('');
+  };
+
+  // Share task to other modules
+  const handleShare = async (task: Task, target: 'industry' | 'learning' | 'journal') => {
+    const timeStr = task.timeSpent > 0 ? `\n\n⏱ 花费时长：${formatDurationCN(task.timeSpent)}` : '';
+    const tagStr = task.tags.length > 0 ? `\n🏷 标签：${task.tags.map(t => TAG_OPTIONS.find(o => o.value === t)?.label || t).join('、')}` : '';
+    const descStr = task.description ? `\n\n${task.description}` : '';
+
+    if (target === 'industry') {
+      await addResearch({
+        title: task.title,
+        industry: '待分类',
+        date: task.dueDate,
+        participants: '',
+        summary: `来自任务：${task.title}${tagStr}${timeStr}${descStr}`,
+        keyFindings: '',
+        investmentImplications: '',
+        status: 'draft',
+        tags: task.tags,
+      });
+      setShareSuccess('已分享至产业调研');
+    } else if (target === 'learning') {
+      await addLearning({
+        title: task.title,
+        type: 'report',
+        progress: task.completed ? 100 : 0,
+        notes: `来自任务：${task.title}${tagStr}${timeStr}${descStr}`,
+        start_date: task.dueDate,
+      });
+      setShareSuccess('已分享至学习追踪');
+    } else if (target === 'journal') {
+      const today = formatDate(new Date());
+      await addJournal({
+        date: today,
+        market_view: '',
+        decisions: `来自任务：${task.title}${tagStr}${timeStr}${descStr}`,
+        reflections: '',
+        mood: 'neutral',
+      });
+      setShareSuccess('已分享至投资笔记');
+    }
+    setShareTaskId(null);
+    setTimeout(() => setShareSuccess(''), 2000);
   };
 
   // Start edit
@@ -695,6 +752,9 @@ ${
 
                       {/* Actions */}
                       <div className="flex items-center gap-0.5">
+                        <button onClick={() => setShareTaskId(task.id)} className="p-1.5 text-text-muted hover:text-gold transition-colors" title="分享">
+                          <Share2 size={14} />
+                        </button>
                         <button onClick={() => openDescEditor(task)} className="p-1.5 text-text-muted hover:text-gold transition-colors" title="编辑详情">
                           <Maximize2 size={14} />
                         </button>
@@ -863,6 +923,78 @@ ${
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Share task modal */}
+      {shareTaskId && (() => {
+        const task = tasks.find((t) => t.id === shareTaskId);
+        if (!task) return null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShareTaskId(null)}>
+            <div className="card p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                  <Share2 size={18} className="text-gold" />
+                  分享任务
+                </h3>
+                <button onClick={() => setShareTaskId(null)} className="text-text-muted hover:text-text-primary">
+                  <X size={18} />
+                </button>
+              </div>
+
+              <p className="text-sm text-text-primary mb-1 font-medium">{task.title}</p>
+              <p className="text-xs text-text-muted mb-5">选择分享到哪个模块</p>
+
+              <div className="space-y-2.5">
+                <button
+                  onClick={() => handleShare(task, 'industry')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 hover:bg-emerald-500/10 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                    <Building2 size={20} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">产业调研</p>
+                    <p className="text-xs text-text-muted">创建为调研草稿</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleShare(task, 'learning')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center flex-shrink-0">
+                    <BookOpen size={20} className="text-purple-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">学习追踪</p>
+                    <p className="text-xs text-text-muted">创建为学习记录</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleShare(task, 'journal')}
+                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0">
+                    <PenLine size={20} className="text-amber-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-text-primary">投资笔记</p>
+                    <p className="text-xs text-text-muted">添加到今日日记</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Share success toast */}
+      {shareSuccess && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-xl bg-positive/90 text-white text-sm font-medium shadow-lg animate-fade-in-up">
+          {shareSuccess}
         </div>
       )}
     </div>
