@@ -386,6 +386,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
               return <div key={i} className="w-px h-5 bg-border-custom mx-1.5" />;
             }
             const Icon = 'icon' in item ? item.icon : Type;
+            const isTableBtn = 'title' in item && item.title === '插入表格';
             return (
               <button
                 key={i}
@@ -393,10 +394,11 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
                   if ('action' in item && item.action) item.action();
                   else if ('cmd' in item) execCmd(item.cmd);
                 }}
-                className="p-1.5 rounded text-text-secondary hover:text-gold hover:bg-gold/10 transition-colors"
+                className={`p-1.5 rounded text-text-secondary hover:text-gold hover:bg-gold/10 transition-colors flex items-center gap-1 ${isTableBtn ? 'bg-gold/10 text-gold border border-gold/20' : ''}`}
                 title={'title' in item ? item.title : ''}
               >
                 <Icon size={15} />
+                {isTableBtn && <span className="text-xs">表格</span>}
               </button>
             );
           })}
@@ -591,7 +593,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
 
         {/* Footer hint */}
         <div className="px-4 py-1.5 border-t border-border-custom text-xs text-text-muted flex justify-between flex-shrink-0">
-          <span>选中文本后可设置格式 | 支持粘贴截图{parentId ? ' | 点击📎上传附件' : ''}</span>
+          <span>选中文本后可设置格式 | 点击「表格」插入表格 | Ctrl+V粘贴截图可拖拽缩放{parentId ? ' | 点击📎上传附件' : ''}</span>
           <span>附件限100MB以内</span>
         </div>
       </div>
