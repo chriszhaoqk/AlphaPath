@@ -21,7 +21,7 @@ import {
   BookOpen,
   PenLine,
 } from 'lucide-react';
-import { useTaskStore, type Quadrant, type TagType, type Task } from '@/store/useTaskStore';
+import { useTaskStore, type Quadrant, type TagType, type Task, type TaskScope } from '@/store/useTaskStore';
 import { useIndustryStore } from '@/store/useIndustryStore';
 import { useLearningStore } from '@/store/useLearningStore';
 import { useJournalStore } from '@/store/useJournalStore';
@@ -47,6 +47,26 @@ const TAG_OPTIONS: { value: TagType; label: string }[] = [
 ];
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
+
+const SCOPE_TABS: { key: TaskScope; label: string }[] = [
+  { key: 'daily', label: '每日' },
+  { key: 'weekly', label: '每周' },
+  { key: 'monthly', label: '每月' },
+];
+
+// 获取某日期所在周的周一日期
+function getWeekStart(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const dayOfWeek = d.getDay();
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - ((dayOfWeek + 6) % 7));
+  return formatDate(monday);
+}
+
+// 获取某日期所在月份 YYYY-MM
+function getMonthKey(dateStr: string): string {
+  return dateStr.slice(0, 7);
+}
 
 function formatDate(date: Date): string {
   const y = date.getFullYear();
@@ -105,6 +125,7 @@ export default function Tasks() {
 
   // Current selected date
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+  const [scope, setScope] = useState<TaskScope>('daily');
 
   // Add task form
   const [showAddForm, setShowAddForm] = useState(false);
@@ -147,7 +168,13 @@ export default function Tasks() {
   // Date navigation
   const navigateDate = (offset: number) => {
     const d = new Date(selectedDate + 'T00:00:00');
-    d.setDate(d.getDate() + offset);
+    if (scope === 'daily') {
+      d.setDate(d.getDate() + offset);
+    } else if (scope === 'weekly') {
+      d.setDate(d.getDate() + offset * 7);
+    } else {
+      d.setMonth(d.getMonth() + offset);
+    }
     setSelectedDate(formatDate(d));
   };
 
@@ -166,18 +193,32 @@ export default function Tasks() {
     });
   }, [selectedDate]);
 
-  // Tasks for selected date
+  // Tasks for selected scope
   const dayTasks = useMemo(() => {
-    return tasks
-      .filter((t) => t.dueDate === selectedDate)
-      .sort((a, b) => {
-        // Active timer tasks first, then uncompleted, then by quadrant
-        if (a.timerStartedAt && !b.timerStartedAt) return -1;
-        if (!a.timerStartedAt && b.timerStartedAt) return 1;
-        if (a.completed !== b.completed) return a.completed ? 1 : -1;
-        return a.quadrant.localeCompare(b.quadrant);
-      });
-  }, [tasks, selectedDate]);
+    let filtered: Task[];
+    if (scope === 'daily') {
+      filtered = tasks.filter((t) => t.dueDate === selectedDate);
+    } else if (scope === 'weekly') {
+      const weekStart = getWeekStart(selectedDate);
+      const weekEnd = (() => {
+        const d = new Date(weekStart + 'T00:00:00');
+        d.setDate(d.getDate() + 6);
+        return formatDate(d);
+      })();
+      filtered = tasks.filter((t) => t.dueDate >= weekStart && t.dueDate <= weekEnd);
+    } else {
+      // monthly
+      const monthKey = getMonthKey(selectedDate);
+      filtered = tasks.filter((t) => getMonthKey(t.dueDate) === monthKey);
+    }
+    return filtered.sort((a, b) => {
+      // Active timer tasks first, then uncompleted, then by quadrant
+      if (a.timerStartedAt && !b.timerStartedAt) return -1;
+      if (!a.timerStartedAt && b.timerStartedAt) return 1;
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      return a.quadrant.localeCompare(b.quadrant);
+    });
+  }, [tasks, selectedDate, scope]);
 
   const completedCount = dayTasks.filter((t) => t.completed).length;
   const totalCount = dayTasks.length;
@@ -197,6 +238,7 @@ export default function Tasks() {
       title: newTitle.trim(),
       quadrant: newQuadrant,
       tags: newTags,
+      scope,
       completed: false,
       dueDate: selectedDate,
       timeSpent: 0,
@@ -479,6 +521,23 @@ ${
         </button>
       </div>
 
+      {/* Scope Tabs */}
+      <div className="flex gap-2">
+        {SCOPE_TABS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setScope(tab.key)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+              scope === tab.key
+                ? 'bg-gold/20 text-gold border border-gold/30'
+                : 'bg-card border border-border-custom text-text-secondary hover:text-text-primary'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* Date Picker */}
       <div className="card p-3">
         <div className="flex items-center justify-between mb-3">
@@ -488,7 +547,21 @@ ${
           <button onClick={goToToday} className="flex items-center gap-2">
             <Calendar size={16} className="text-gold" />
             <span className={`text-base font-semibold ${isToday(selectedDate) ? 'text-gold' : 'text-text-primary'}`}>
-              {isToday(selectedDate) ? '今天' : formatDateCN(selectedDate)}
+              {scope === 'daily'
+                ? (isToday(selectedDate) ? '今天' : formatDateCN(selectedDate))
+                : scope === 'weekly'
+                  ? (() => {
+                      const ws = getWeekStart(selectedDate);
+                      const d = new Date(ws + 'T00:00:00');
+                      const end = new Date(ws + 'T00:00:00');
+                      end.setDate(end.getDate() + 6);
+                      return `${d.getMonth() + 1}/${d.getDate()} - ${end.getMonth() + 1}/${end.getDate()} 周`;
+                    })()
+                  : (() => {
+                      const d = new Date(selectedDate + 'T00:00:00');
+                      return `${d.getFullYear()}年${d.getMonth() + 1}月`;
+                    })()
+              }
             </span>
           </button>
           <button onClick={() => navigateDate(1)} className="p-2 rounded-lg text-text-muted hover:text-gold hover:bg-gold/10 transition-colors">
@@ -496,43 +569,133 @@ ${
           </button>
         </div>
 
-        {/* Week strip */}
-        <div className="grid grid-cols-7 gap-1">
-          {weekDates.map((dateStr) => {
-            const d = new Date(dateStr + 'T00:00:00');
-            const dayNum = d.getDate();
-            const weekday = WEEKDAYS[d.getDay()];
-            const selected = dateStr === selectedDate;
-            const today = isToday(dateStr);
-            const dayTaskCount = tasks.filter((t) => t.dueDate === dateStr).length;
-            const dayCompleted = tasks.filter((t) => t.dueDate === dateStr && t.completed).length;
+        {/* Week strip - only show in daily mode */}
+        {scope === 'daily' && (
+          <div className="grid grid-cols-7 gap-1">
+            {weekDates.map((dateStr) => {
+              const d = new Date(dateStr + 'T00:00:00');
+              const dayNum = d.getDate();
+              const weekday = WEEKDAYS[d.getDay()];
+              const selected = dateStr === selectedDate;
+              const today = isToday(dateStr);
+              const dayTaskCount = tasks.filter((t) => t.dueDate === dateStr).length;
+              const dayCompleted = tasks.filter((t) => t.dueDate === dateStr && t.completed).length;
 
-            return (
-              <button
-                key={dateStr}
-                onClick={() => setSelectedDate(dateStr)}
-                className={`flex flex-col items-center py-2 rounded-xl transition-colors ${
-                  selected
-                    ? 'bg-gold/15 border border-gold/30'
-                    : today
-                      ? 'bg-[#1A1F2E] border border-border-custom'
-                      : 'hover:bg-[#1A1F2E]'
-                }`}
-              >
-                <span className={`text-[10px] ${selected ? 'text-gold' : 'text-text-muted'}`}>{weekday}</span>
-                <span className={`text-lg font-semibold ${selected ? 'text-gold' : today ? 'text-text-primary' : 'text-text-secondary'}`}>
-                  {dayNum}
-                </span>
-                {dayTaskCount > 0 && (
-                  <div className="flex items-center gap-0.5 mt-0.5">
-                    <div className={`w-1 h-1 rounded-full ${dayCompleted === dayTaskCount ? 'bg-positive' : 'bg-gold'}`} />
-                    <span className="text-[9px] text-text-muted">{dayCompleted}/{dayTaskCount}</span>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={dateStr}
+                  onClick={() => setSelectedDate(dateStr)}
+                  className={`flex flex-col items-center py-2 rounded-xl transition-colors ${
+                    selected
+                      ? 'bg-gold/15 border border-gold/30'
+                      : today
+                        ? 'bg-[#1A1F2E] border border-border-custom'
+                        : 'hover:bg-[#1A1F2E]'
+                  }`}
+                >
+                  <span className={`text-[10px] ${selected ? 'text-gold' : 'text-text-muted'}`}>{weekday}</span>
+                  <span className={`text-lg font-semibold ${selected ? 'text-gold' : today ? 'text-text-primary' : 'text-text-secondary'}`}>
+                    {dayNum}
+                  </span>
+                  {dayTaskCount > 0 && (
+                    <div className="flex items-center gap-0.5 mt-0.5">
+                      <div className={`w-1 h-1 rounded-full ${dayCompleted === dayTaskCount ? 'bg-positive' : 'bg-gold'}`} />
+                      <span className="text-[9px] text-text-muted">{dayCompleted}/{dayTaskCount}</span>
+                    </div>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Week overview - show in weekly mode */}
+        {scope === 'weekly' && (() => {
+          const ws = getWeekStart(selectedDate);
+          return (
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: 7 }, (_, i) => {
+                const d = new Date(ws + 'T00:00:00');
+                d.setDate(d.getDate() + i);
+                const dateStr = formatDate(d);
+                const dayTasks = tasks.filter((t) => t.dueDate === dateStr);
+                const dayCompleted = dayTasks.filter((t) => t.completed).length;
+                const today = isToday(dateStr);
+                return (
+                  <button
+                    key={dateStr}
+                    onClick={() => { setSelectedDate(dateStr); setScope('daily'); }}
+                    className={`flex flex-col items-center py-2 rounded-xl transition-colors ${
+                      today
+                        ? 'bg-gold/10 border border-gold/20'
+                        : 'hover:bg-[#1A1F2E]'
+                    }`}
+                  >
+                    <span className="text-[10px] text-text-muted">{WEEKDAYS[d.getDay()]}</span>
+                    <span className={`text-lg font-semibold ${today ? 'text-gold' : 'text-text-secondary'}`}>{d.getDate()}</span>
+                    {dayTasks.length > 0 && (
+                      <div className="flex items-center gap-0.5 mt-0.5">
+                        <div className={`w-1 h-1 rounded-full ${dayCompleted === dayTasks.length ? 'bg-positive' : 'bg-gold'}`} />
+                        <span className="text-[9px] text-text-muted">{dayCompleted}/{dayTasks.length}</span>
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
+
+        {/* Month overview - show in monthly mode */}
+        {scope === 'monthly' && (() => {
+          const d = new Date(selectedDate + 'T00:00:00');
+          const year = d.getFullYear();
+          const month = d.getMonth();
+          const firstDay = new Date(year, month, 1);
+          const lastDay = new Date(year, month + 1, 0);
+          const startPad = (firstDay.getDay() + 6) % 7; // Monday=0
+          const daysInMonth = lastDay.getDate();
+          const cells = [];
+          // Padding
+          for (let i = 0; i < startPad; i++) cells.push(null);
+          // Days
+          for (let i = 1; i <= daysInMonth; i++) {
+            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+            cells.push(dateStr);
+          }
+          return (
+            <div>
+              <div className="grid grid-cols-7 gap-0.5 mb-1">
+                {['一', '二', '三', '四', '五', '六', '日'].map((w) => (
+                  <div key={w} className="text-center text-[10px] text-text-muted py-1">{w}</div>
+                ))}
+              </div>
+              <div className="grid grid-cols-7 gap-0.5">
+                {cells.map((dateStr, i) => {
+                  if (!dateStr) return <div key={`pad-${i}`} />;
+                  const dayNum = parseInt(dateStr.slice(8));
+                  const today = isToday(dateStr);
+                  const dayTasks = tasks.filter((t) => t.dueDate === dateStr);
+                  const dayCompleted = dayTasks.filter((t) => t.completed).length;
+                  return (
+                    <button
+                      key={dateStr}
+                      onClick={() => { setSelectedDate(dateStr); setScope('daily'); }}
+                      className={`flex flex-col items-center py-1.5 rounded-lg transition-colors ${
+                        today ? 'bg-gold/10 border border-gold/20' : 'hover:bg-[#1A1F2E]'
+                      }`}
+                    >
+                      <span className={`text-sm font-medium ${today ? 'text-gold' : 'text-text-secondary'}`}>{dayNum}</span>
+                      {dayTasks.length > 0 && (
+                        <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${dayCompleted === dayTasks.length ? 'bg-positive' : 'bg-gold'}`} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Progress bar + total time */}
@@ -541,7 +704,9 @@ ${
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <ListTodo size={16} className="text-gold" />
-              <span className="text-sm text-text-primary font-medium">今日进度</span>
+              <span className="text-sm text-text-primary font-medium">
+                {scope === 'daily' ? '今日进度' : scope === 'weekly' ? '本周进度' : '本月进度'}
+              </span>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1 text-sm text-text-muted">
@@ -625,7 +790,7 @@ ${
           </div>
 
           <button onClick={handleAddTask} disabled={!newTitle.trim()} className="btn-gold w-full py-2.5 text-sm disabled:opacity-40">
-            添加到 {formatDateCN(selectedDate)}
+            {scope === 'daily' ? `添加到 ${formatDateCN(selectedDate)}` : scope === 'weekly' ? '添加到本周' : '添加到本月'}
           </button>
         </div>
       )}
@@ -635,7 +800,9 @@ ${
         {dayTasks.length === 0 ? (
           <div className="card p-8 text-center">
             <ListTodo size={32} className="text-text-muted mx-auto mb-3" />
-            <p className="text-text-muted text-sm">今日暂无任务</p>
+            <p className="text-text-muted text-sm">
+              {scope === 'daily' ? '今日暂无任务' : scope === 'weekly' ? '本周暂无任务' : '本月暂无任务'}
+            </p>
             <button onClick={() => setShowAddForm(true)} className="mt-3 text-gold text-sm hover:underline">
               + 添加第一个任务
             </button>
@@ -719,9 +886,14 @@ ${
                       </button>
 
                       {/* Title */}
-                      <span className={`flex-1 text-sm min-w-0 ${task.completed ? 'line-through text-text-muted' : 'text-text-primary'}`}>
-                        {task.title}
-                      </span>
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-sm ${task.completed ? 'line-through text-text-muted' : 'text-text-primary'}`}>
+                          {task.title}
+                        </span>
+                        {scope !== 'daily' && (
+                          <span className="text-[10px] text-text-muted ml-2">{task.dueDate.slice(5)}</span>
+                        )}
+                      </div>
 
                       {/* Timer display + toggle */}
                       <button

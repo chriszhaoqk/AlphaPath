@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type Quadrant = 'A' | 'B' | 'C' | 'D';
 export type TagType = 'industry' | 'macro' | 'strategy' | 'quant' | 'learning' | 'review' | 'output' | 'network';
+export type TaskScope = 'daily' | 'weekly' | 'monthly';
 
 export interface Task {
   id: string;
@@ -10,6 +11,7 @@ export interface Task {
   description?: string;
   quadrant: Quadrant;
   tags: TagType[];
+  scope: TaskScope; // daily=每日任务, weekly=周度任务, monthly=月度任务
   completed: boolean;
   dueDate: string; // 日期 YYYY-MM-DD，作为任务归属日期
   completedAt?: string;
