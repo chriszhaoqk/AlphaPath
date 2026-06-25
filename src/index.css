@@ -52,6 +52,34 @@
 .prose-sm u {
   text-decoration: underline;
 }
+.prose-sm table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5em 0;
+}
+.prose-sm th {
+  border: 1px solid #2A3040;
+  padding: 6px 10px;
+  background: #1A1F2E;
+  color: #D4A853;
+  font-size: 0.9em;
+  text-align: left;
+}
+.prose-sm td {
+  border: 1px solid #2A3040;
+  padding: 6px 10px;
+  font-size: 0.9em;
+}
+.prose-sm img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 0.5em 0;
+  cursor: nwse-resize;
+}
+.prose-sm img[data-selected] {
+  outline: 2px solid #D4A853;
+}
 
 :root {
   --bg-primary: #0F1419;

@@ -22,6 +22,7 @@ import {
   XCircle,
   Mic,
   GripVertical,
+  Table,
 } from 'lucide-react';
 import { useAttachmentStore, generateAttachmentSummary, type Attachment } from '@/store/useAttachmentStore';
 import VoiceInput, { isVoiceSupported } from '@/components/VoiceInput';
@@ -97,6 +98,38 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
 
   // AI summary
   const [summarizingId, setSummarizingId] = useState<string | null>(null);
+
+  // Table insertion
+  const [showTablePicker, setShowTablePicker] = useState(false);
+  const [tableRows, setTableRows] = useState(3);
+  const [tableCols, setTableCols] = useState(3);
+
+  // Insert table into editor
+  const insertTable = useCallback(() => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    const rows = Math.max(1, tableRows);
+    const cols = Math.max(1, tableCols);
+    let html = '<table style="border-collapse:collapse; width:100%; margin:0.5em 0;">';
+    // Header row
+    html += '<tr>';
+    for (let c = 0; c < cols; c++) {
+      html += `<th style="border:1px solid #2A3040; padding:6px 10px; background:#1A1F2E; color:#D4A853; font-size:0.9em; text-align:left;">标题${c + 1}</th>`;
+    }
+    html += '</tr>';
+    // Data rows
+    for (let r = 0; r < rows - 1; r++) {
+      html += '<tr>';
+      for (let c = 0; c < cols; c++) {
+        html += `<td style="border:1px solid #2A3040; padding:6px 10px; font-size:0.9em;">&nbsp;</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</table><p><br/></p>';
+    document.execCommand('insertHTML', false, html);
+    setShowTablePicker(false);
+    updateWordCount();
+  }, [tableRows, tableCols]);
 
   // Voice input handler
   const handleVoiceInput = useCallback((text: string) => {
@@ -180,6 +213,81 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
     onSave(html);
   };
 
+  // Paste image handler
+  const handlePaste = useCallback((e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (!file) continue;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const dataUrl = ev.target?.result as string;
+          if (editorRef.current) {
+            editorRef.current.focus();
+            const imgHtml = `<img src="${dataUrl}" style="max-width:100%; height:auto; cursor:nwse-resize; display:block; margin:0.5em 0; border-radius:6px;" />`;
+            document.execCommand('insertHTML', false, imgHtml);
+            updateWordCount();
+          }
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  }, []);
+
+  // Image resize: click to select, drag corner to resize
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+
+    const handleClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      // Remove previous selection
+      editor.querySelectorAll('img[data-selected]').forEach((img) => {
+        img.removeAttribute('data-selected');
+        img.style.outline = '';
+      });
+      if (target.tagName === 'IMG' && target.closest('[contenteditable]')) {
+        target.setAttribute('data-selected', 'true');
+        target.style.outline = '2px solid #D4A853';
+      }
+    };
+
+    const handleMouseDown = (e: Event) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName !== 'IMG' || !target.closest('[contenteditable]')) return;
+      e.preventDefault();
+      const img = target as HTMLImageElement;
+      const startX = (e as MouseEvent).clientX;
+      const startWidth = img.offsetWidth;
+      const startHeight = img.offsetHeight;
+      const ratio = startHeight / startWidth;
+
+      const handleMouseMove = (me: MouseEvent) => {
+        const dx = me.clientX - startX;
+        const newWidth = Math.max(50, startWidth + dx);
+        img.style.width = `${newWidth}px`;
+        img.style.height = `${newWidth * ratio}px`;
+      };
+      const handleMouseUp = () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    };
+
+    editor.addEventListener('click', handleClick);
+    editor.addEventListener('mousedown', handleMouseDown);
+    return () => {
+      editor.removeEventListener('click', handleClick);
+      editor.removeEventListener('mousedown', handleMouseDown);
+    };
+  }, []);
+
   // File upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -232,6 +340,8 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
     { sep: true },
     { icon: List, cmd: 'insertUnorderedList', title: '无序列表' },
     { icon: Indent, action: handleIndent, title: '首行缩进' },
+    { sep: true },
+    { icon: Table, action: () => setShowTablePicker(true), title: '插入表格' },
   ];
 
   return (
@@ -362,6 +472,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
             contentEditable
             suppressContentEditableWarning
             onInput={updateWordCount}
+            onPaste={handlePaste}
             className="flex-1 overflow-y-auto px-5 py-4 text-text-primary leading-relaxed focus:outline-none"
             style={{ fontSize: `${fontSize}px` }}
           />
@@ -480,10 +591,79 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
 
         {/* Footer hint */}
         <div className="px-4 py-1.5 border-t border-border-custom text-xs text-text-muted flex justify-between flex-shrink-0">
-          <span>选中文本后可设置格式{parentId ? ' | 点击📎上传附件' : ''}</span>
+          <span>选中文本后可设置格式 | 支持粘贴截图{parentId ? ' | 点击📎上传附件' : ''}</span>
           <span>附件限100MB以内</span>
         </div>
       </div>
+
+      {/* Table Picker Popup */}
+      {showTablePicker && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" onClick={() => setShowTablePicker(false)}>
+          <div className="card p-5 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                <Table size={18} className="text-gold" />
+                插入表格
+              </h3>
+              <button onClick={() => setShowTablePicker(false)} className="text-text-muted hover:text-text-primary">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex items-end gap-4 mb-4">
+              <div className="flex-1">
+                <label className="block text-xs text-text-secondary mb-1.5">行数</label>
+                <input
+                  type="number"
+                  min="2"
+                  max="20"
+                  value={tableRows}
+                  onChange={(e) => setTableRows(Math.max(2, Math.min(20, parseInt(e.target.value) || 2)))}
+                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-center text-lg text-text-primary focus:outline-none focus:border-gold/50"
+                />
+              </div>
+              <span className="text-text-muted pb-3">×</span>
+              <div className="flex-1">
+                <label className="block text-xs text-text-secondary mb-1.5">列数</label>
+                <input
+                  type="number"
+                  min="2"
+                  max="10"
+                  value={tableCols}
+                  onChange={(e) => setTableCols(Math.max(2, Math.min(10, parseInt(e.target.value) || 2)))}
+                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-center text-lg text-text-primary focus:outline-none focus:border-gold/50"
+                />
+              </div>
+            </div>
+
+            {/* Quick presets */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {[
+                { r: 3, c: 3, label: '3×3' },
+                { r: 4, c: 3, label: '4×3' },
+                { r: 5, c: 4, label: '5×4' },
+                { r: 6, c: 5, label: '6×5' },
+              ].map((preset) => (
+                <button
+                  key={preset.label}
+                  onClick={() => { setTableRows(preset.r); setTableCols(preset.c); }}
+                  className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${
+                    tableRows === preset.r && tableCols === preset.c
+                      ? 'border-gold/50 bg-gold/10 text-gold'
+                      : 'border-border-custom bg-[#1A1F2E] text-text-secondary hover:text-gold hover:border-gold/30'
+                  }`}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <button onClick={insertTable} className="btn-gold w-full py-2.5 text-sm">
+              插入 {tableRows}×{tableCols} 表格
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* File Preview Modal */}
       {previewAttachment && (
