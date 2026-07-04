@@ -193,24 +193,9 @@ export default function Tasks() {
     });
   }, [selectedDate]);
 
-  // Tasks for selected scope
+  // Tasks for selected scope (strictly isolated by scope)
   const dayTasks = useMemo(() => {
-    let filtered: Task[];
-    if (scope === 'daily') {
-      filtered = tasks.filter((t) => t.dueDate === selectedDate);
-    } else if (scope === 'weekly') {
-      const weekStart = getWeekStart(selectedDate);
-      const weekEnd = (() => {
-        const d = new Date(weekStart + 'T00:00:00');
-        d.setDate(d.getDate() + 6);
-        return formatDate(d);
-      })();
-      filtered = tasks.filter((t) => t.dueDate >= weekStart && t.dueDate <= weekEnd);
-    } else {
-      // monthly
-      const monthKey = getMonthKey(selectedDate);
-      filtered = tasks.filter((t) => getMonthKey(t.dueDate) === monthKey);
-    }
+    const filtered = tasks.filter((t) => t.scope === scope && t.dueDate === selectedDate);
     return filtered.sort((a, b) => {
       // Active timer tasks first, then uncompleted, then by quadrant
       if (a.timerStartedAt && !b.timerStartedAt) return -1;
@@ -578,8 +563,8 @@ ${
               const weekday = WEEKDAYS[d.getDay()];
               const selected = dateStr === selectedDate;
               const today = isToday(dateStr);
-              const dayTaskCount = tasks.filter((t) => t.dueDate === dateStr).length;
-              const dayCompleted = tasks.filter((t) => t.dueDate === dateStr && t.completed).length;
+              const dayTaskCount = tasks.filter((t) => t.scope === 'daily' && t.dueDate === dateStr).length;
+              const dayCompleted = tasks.filter((t) => t.scope === 'daily' && t.dueDate === dateStr && t.completed).length;
 
               return (
                 <button
@@ -618,7 +603,7 @@ ${
                 const d = new Date(ws + 'T00:00:00');
                 d.setDate(d.getDate() + i);
                 const dateStr = formatDate(d);
-                const dayTasks = tasks.filter((t) => t.dueDate === dateStr);
+                const dayTasks = tasks.filter((t) => t.scope === 'weekly' && t.dueDate === dateStr);
                 const dayCompleted = dayTasks.filter((t) => t.completed).length;
                 const today = isToday(dateStr);
                 return (
@@ -675,7 +660,7 @@ ${
                   if (!dateStr) return <div key={`pad-${i}`} />;
                   const dayNum = parseInt(dateStr.slice(8));
                   const today = isToday(dateStr);
-                  const dayTasks = tasks.filter((t) => t.dueDate === dateStr);
+                  const dayTasks = tasks.filter((t) => t.scope === 'monthly' && t.dueDate === dateStr);
                   const dayCompleted = dayTasks.filter((t) => t.completed).length;
                   return (
                     <button
@@ -972,7 +957,8 @@ ${
         )}
       </div>
 
-      {/* Daily Summary */}
+      {/* Daily Summary - only in daily scope */}
+      {scope === 'daily' && (
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
@@ -1004,6 +990,7 @@ ${
           </div>
         )}
       </div>
+      )}
 
       {/* Fullscreen Editor for task description */}
       {editorOpen && editorTaskId && (
