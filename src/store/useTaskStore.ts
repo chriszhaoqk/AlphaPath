@@ -103,20 +103,13 @@ export const useTaskStore = create<TaskState>()(
     }),
     {
       name: 'alphapath-tasks',
-      version: 1,
+      version: 2,
       migrate: (persisted: any, version: number) => {
-        if (version === 0) {
-          // v0 -> v1: 清理旧任务，只保留标题含"智谱"的任务，并添加 scope 字段
-          const state = persisted as { tasks?: Task[]; dailySummaries?: DailySummary[] };
-          const kept = (state.tasks || []).filter((t: Task) =>
-            t.title && t.title.includes('智谱')
-          ).map((t: Task) => ({
-            ...t,
-            scope: t.scope || 'daily' as TaskScope,
-          }));
+        if (version < 2) {
+          // v2: 清空所有已记录的任务和总结数据
           return {
-            ...state,
-            tasks: kept,
+            ...persisted,
+            tasks: [],
             dailySummaries: [],
           };
         }
