@@ -29,7 +29,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '仪表盘' },
   { to: '/roadmap', icon: Target, label: '目标路线图' },
-  { to: '/schedule', icon: Calendar, label: '日程管理' },
+
   { to: '/tasks', icon: CheckSquare, label: '任务中心' },
   { to: '/industry', icon: Building2, label: '产业调研' },
   { to: '/funds', icon: Wallet, label: '家庭资金' },

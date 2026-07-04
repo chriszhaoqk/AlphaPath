@@ -9,7 +9,6 @@ import JournalPage from '@/pages/Journal';
 import Skills from '@/pages/Skills';
 import Strategy from '@/pages/Strategy';
 import Settings from '@/pages/Settings';
-import Schedule from '@/pages/Schedule';
 import Tasks from '@/pages/Tasks';
 import Dashboard from '@/pages/Dashboard';
 import Roadmap from '@/pages/Roadmap';
@@ -61,7 +60,7 @@ export default function App() {
         >
           <Route path="/" element={<Dashboard />} />
           <Route path="/roadmap" element={<Roadmap />} />
-          <Route path="/schedule" element={<Schedule />} />
+
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/industry" element={<IndustryPage />} />
           <Route path="/funds" element={<FundsPage />} />
