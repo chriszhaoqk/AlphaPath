@@ -68,6 +68,37 @@ function getMonthKey(dateStr: string): string {
   return dateStr.slice(0, 7);
 }
 
+// 获取某日期所在年份的周数（ISO 周数），返回 YYYY-Www
+function getWeekKey(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00');
+  const target = new Date(d.valueOf());
+  const dayNr = (d.getDay() + 6) % 7; // 周一=0
+  target.setDate(target.getDate() - dayNr + 3); // 定位到本周四
+  const firstThursday = new Date(target.getFullYear(), 0, 4);
+  const diff = target.valueOf() - firstThursday.valueOf();
+  const weekNo = 1 + Math.ceil(diff / (7 * 24 * 60 * 60 * 1000));
+  return `${target.getFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+}
+
+// 格式化周标识为中文：2026年第26周
+function formatWeekLabel(weekKey: string): string {
+  const [year, w] = weekKey.split('-W');
+  return `${year}年第${parseInt(w, 10)}周`;
+}
+
+// 格式化月标识为中文：2026年6月
+function formatMonthLabel(monthKey: string): string {
+  const [year, m] = monthKey.split('-');
+  return `${year}年${parseInt(m, 10)}月`;
+}
+
+// 根据scope和日期获取归属标识
+function getScopeKey(dateStr: string, scope: TaskScope): string {
+  if (scope === 'weekly') return getWeekKey(dateStr);
+  if (scope === 'monthly') return getMonthKey(dateStr);
+  return dateStr;
+}
+
 function formatDate(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -193,9 +224,10 @@ export default function Tasks() {
     });
   }, [selectedDate]);
 
-  // Tasks for selected scope (strictly isolated by scope)
+  // Tasks for selected scope (strictly isolated by scope, matched by scope key)
+  const currentScopeKey = getScopeKey(selectedDate, scope);
   const dayTasks = useMemo(() => {
-    const filtered = tasks.filter((t) => t.scope === scope && t.dueDate === selectedDate);
+    const filtered = tasks.filter((t) => t.scope === scope && t.dueDate === currentScopeKey);
     return filtered.sort((a, b) => {
       // Active timer tasks first, then uncompleted, then by quadrant
       if (a.timerStartedAt && !b.timerStartedAt) return -1;
@@ -203,7 +235,7 @@ export default function Tasks() {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
       return a.quadrant.localeCompare(b.quadrant);
     });
-  }, [tasks, selectedDate, scope]);
+  }, [tasks, currentScopeKey, scope]);
 
   const completedCount = dayTasks.filter((t) => t.completed).length;
   const totalCount = dayTasks.length;
@@ -225,7 +257,7 @@ export default function Tasks() {
       tags: newTags,
       scope,
       completed: false,
-      dueDate: selectedDate,
+      dueDate: getScopeKey(selectedDate, scope),
       timeSpent: 0,
     });
     setNewTitle('');
@@ -531,21 +563,12 @@ ${
           </button>
           <button onClick={goToToday} className="flex items-center gap-2">
             <Calendar size={16} className="text-gold" />
-            <span className={`text-base font-semibold ${isToday(selectedDate) ? 'text-gold' : 'text-text-primary'}`}>
+            <span className={`text-base font-semibold ${scope === 'daily' && isToday(selectedDate) ? 'text-gold' : 'text-text-primary'}`}>
               {scope === 'daily'
                 ? (isToday(selectedDate) ? '今天' : formatDateCN(selectedDate))
                 : scope === 'weekly'
-                  ? (() => {
-                      const ws = getWeekStart(selectedDate);
-                      const d = new Date(ws + 'T00:00:00');
-                      const end = new Date(ws + 'T00:00:00');
-                      end.setDate(end.getDate() + 6);
-                      return `${d.getMonth() + 1}/${d.getDate()} - ${end.getMonth() + 1}/${end.getDate()} 周`;
-                    })()
-                  : (() => {
-                      const d = new Date(selectedDate + 'T00:00:00');
-                      return `${d.getFullYear()}年${d.getMonth() + 1}月`;
-                    })()
+                  ? formatWeekLabel(getWeekKey(selectedDate))
+                  : formatMonthLabel(getMonthKey(selectedDate))
               }
             </span>
           </button>
@@ -594,93 +617,15 @@ ${
           </div>
         )}
 
-        {/* Week overview - show in weekly mode */}
-        {scope === 'weekly' && (() => {
-          const ws = getWeekStart(selectedDate);
-          return (
-            <div className="grid grid-cols-7 gap-1">
-              {Array.from({ length: 7 }, (_, i) => {
-                const d = new Date(ws + 'T00:00:00');
-                d.setDate(d.getDate() + i);
-                const dateStr = formatDate(d);
-                const dayTasks = tasks.filter((t) => t.scope === 'weekly' && t.dueDate === dateStr);
-                const dayCompleted = dayTasks.filter((t) => t.completed).length;
-                const today = isToday(dateStr);
-                return (
-                  <button
-                    key={dateStr}
-                    onClick={() => { setSelectedDate(dateStr); setScope('daily'); }}
-                    className={`flex flex-col items-center py-2 rounded-xl transition-colors ${
-                      today
-                        ? 'bg-gold/10 border border-gold/20'
-                        : 'hover:bg-[#1A1F2E]'
-                    }`}
-                  >
-                    <span className="text-[10px] text-text-muted">{WEEKDAYS[d.getDay()]}</span>
-                    <span className={`text-lg font-semibold ${today ? 'text-gold' : 'text-text-secondary'}`}>{d.getDate()}</span>
-                    {dayTasks.length > 0 && (
-                      <div className="flex items-center gap-0.5 mt-0.5">
-                        <div className={`w-1 h-1 rounded-full ${dayCompleted === dayTasks.length ? 'bg-positive' : 'bg-gold'}`} />
-                        <span className="text-[9px] text-text-muted">{dayCompleted}/{dayTasks.length}</span>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })()}
-
-        {/* Month overview - show in monthly mode */}
-        {scope === 'monthly' && (() => {
-          const d = new Date(selectedDate + 'T00:00:00');
-          const year = d.getFullYear();
-          const month = d.getMonth();
-          const firstDay = new Date(year, month, 1);
-          const lastDay = new Date(year, month + 1, 0);
-          const startPad = (firstDay.getDay() + 6) % 7; // Monday=0
-          const daysInMonth = lastDay.getDate();
-          const cells = [];
-          // Padding
-          for (let i = 0; i < startPad; i++) cells.push(null);
-          // Days
-          for (let i = 1; i <= daysInMonth; i++) {
-            const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-            cells.push(dateStr);
-          }
-          return (
-            <div>
-              <div className="grid grid-cols-7 gap-0.5 mb-1">
-                {['一', '二', '三', '四', '五', '六', '日'].map((w) => (
-                  <div key={w} className="text-center text-[10px] text-text-muted py-1">{w}</div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-0.5">
-                {cells.map((dateStr, i) => {
-                  if (!dateStr) return <div key={`pad-${i}`} />;
-                  const dayNum = parseInt(dateStr.slice(8));
-                  const today = isToday(dateStr);
-                  const dayTasks = tasks.filter((t) => t.scope === 'monthly' && t.dueDate === dateStr);
-                  const dayCompleted = dayTasks.filter((t) => t.completed).length;
-                  return (
-                    <button
-                      key={dateStr}
-                      onClick={() => { setSelectedDate(dateStr); setScope('daily'); }}
-                      className={`flex flex-col items-center py-1.5 rounded-lg transition-colors ${
-                        today ? 'bg-gold/10 border border-gold/20' : 'hover:bg-[#1A1F2E]'
-                      }`}
-                    >
-                      <span className={`text-sm font-medium ${today ? 'text-gold' : 'text-text-secondary'}`}>{dayNum}</span>
-                      {dayTasks.length > 0 && (
-                        <div className={`w-1.5 h-1.5 rounded-full mt-0.5 ${dayCompleted === dayTasks.length ? 'bg-positive' : 'bg-gold'}`} />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
+        {/* Weekly/Monthly: show period label only, no calendar grid */}
+        {(scope === 'weekly' || scope === 'monthly') && (
+          <div className="flex items-center justify-center py-3 text-sm text-text-secondary">
+            {scope === 'weekly'
+              ? `${formatWeekLabel(getWeekKey(selectedDate))}（周一至周日）`
+              : `${formatMonthLabel(getMonthKey(selectedDate))}（整月）`
+            }
+          </div>
+        )}
       </div>
 
       {/* Progress bar + total time */}
@@ -775,7 +720,7 @@ ${
           </div>
 
           <button onClick={handleAddTask} disabled={!newTitle.trim()} className="btn-gold w-full py-2.5 text-sm disabled:opacity-40">
-            {scope === 'daily' ? `添加到 ${formatDateCN(selectedDate)}` : scope === 'weekly' ? '添加到本周' : '添加到本月'}
+            {scope === 'daily' ? `添加到 ${formatDateCN(selectedDate)}` : scope === 'weekly' ? `添加到 ${formatWeekLabel(getWeekKey(selectedDate))}` : `添加到 ${formatMonthLabel(getMonthKey(selectedDate))}`}
           </button>
         </div>
       )}
@@ -787,6 +732,14 @@ ${
             <ListTodo size={32} className="text-text-muted mx-auto mb-3" />
             <p className="text-text-muted text-sm">
               {scope === 'daily' ? '今日暂无任务' : scope === 'weekly' ? '本周暂无任务' : '本月暂无任务'}
+            </p>
+            <p className="text-xs text-text-muted">
+              {scope === 'daily'
+                ? formatDateCN(selectedDate)
+                : scope === 'weekly'
+                  ? formatWeekLabel(getWeekKey(selectedDate))
+                  : formatMonthLabel(getMonthKey(selectedDate))
+              }
             </p>
             <button onClick={() => setShowAddForm(true)} className="mt-3 text-gold text-sm hover:underline">
               + 添加第一个任务
