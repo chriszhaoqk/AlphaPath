@@ -2,17 +2,17 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
 export interface SkillScores {
-  industry: number;
-  stock: number;
-  macro: number;
-  strategy: number;
-  quant: number;
+  quant: number;       // 量化因子考核
+  strategy: number;    // 策略研究考核
+  industry: number;    // 行业研究考核
+  macro: number;       // 宏观考核
 }
 
 export interface Assessment {
   id: string;
   scores: SkillScores;
   notes?: string;
+  quarter: string;      // e.g. "2026-Q3"
   assessedAt: string;
   createdAt: string;
 }
@@ -26,6 +26,7 @@ interface SkillState {
   fetchAssessments: () => Promise<void>;
   addAssessment: (assessment: Omit<Assessment, 'id' | 'createdAt'>) => Promise<void>;
   getLatestScores: () => SkillScores | null;
+  getAssessmentByQuarter: (quarter: string) => Assessment | undefined;
 }
 
 export const useSkillStore = create<SkillState>()(
@@ -35,9 +36,7 @@ export const useSkillStore = create<SkillState>()(
       loading: false,
       error: null,
 
-      fetchAssessments: async () => {
-        // Data is already in state from persist, no-op
-      },
+      fetchAssessments: async () => {},
 
       addAssessment: async (assessment) => {
         const newAssessment: Assessment = {
@@ -45,7 +44,11 @@ export const useSkillStore = create<SkillState>()(
           id: generateId(),
           createdAt: new Date().toISOString(),
         };
-        set((state) => ({ assessments: [...state.assessments, newAssessment] }));
+        set((state) => {
+          // 同一季度覆盖旧评估
+          const filtered = state.assessments.filter((a) => a.quarter !== assessment.quarter);
+          return { assessments: [...filtered, newAssessment] };
+        });
       },
 
       getLatestScores: () => {
@@ -56,9 +59,36 @@ export const useSkillStore = create<SkillState>()(
         );
         return sorted[0].scores;
       },
+
+      getAssessmentByQuarter: (quarter) => {
+        return get().assessments.find((a) => a.quarter === quarter);
+      },
     }),
     {
       name: 'alphapath-skills',
+      version: 2,
+      migrate: (persisted: any, version: number) => {
+        if (version < 2) {
+          // v2: 迁移到4维模型，清空旧数据
+          return { ...persisted, assessments: [] };
+        }
+        return persisted;
+      },
     }
   )
 );
+
+// 获取当前季度标识 YYYY-QN
+export function getCurrentQuarter(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const q = Math.floor(month / 3) + 1;
+  return `${year}-Q${q}`;
+}
+
+// 获取某季度的中文标签
+export function formatQuarterLabel(quarter: string): string {
+  const [year, q] = quarter.split('-Q');
+  return `${year}年第${q}季度`;
+}

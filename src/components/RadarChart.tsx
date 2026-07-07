@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 
 interface RadarScores {
-  industry: number;
-  stock: number;
-  macro: number;
-  strategy: number;
   quant: number;
+  strategy: number;
+  industry: number;
+  macro: number;
 }
 
 interface RadarChartProps {
@@ -15,11 +14,10 @@ interface RadarChartProps {
 }
 
 const LABELS: Record<keyof RadarScores, string> = {
+  quant: '量化因子',
+  strategy: '策略研究',
   industry: '行业研究',
-  stock: '个股分析',
-  macro: '宏观视野',
-  strategy: '策略构建',
-  quant: '量化思维',
+  macro: '宏观考核',
 };
 
 export default function RadarChart({ scores, maxScore = 10, size = 300 }: RadarChartProps) {
@@ -35,7 +33,7 @@ export default function RadarChart({ scores, maxScore = 10, size = 300 }: RadarC
 
   const center = size / 2;
   const radius = size * 0.35;
-  const axes: (keyof RadarScores)[] = ['industry', 'stock', 'macro', 'strategy', 'quant'];
+  const axes: (keyof RadarScores)[] = ['quant', 'strategy', 'industry', 'macro'];
   const angleStep = (2 * Math.PI) / axes.length;
   const startAngle = -Math.PI / 2;
 

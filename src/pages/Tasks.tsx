@@ -52,6 +52,7 @@ const SCOPE_TABS: { key: TaskScope; label: string }[] = [
   { key: 'daily', label: '每日' },
   { key: 'weekly', label: '每周' },
   { key: 'monthly', label: '每月' },
+  { key: 'yearly', label: '每年' },
 ];
 
 // 获取某日期所在周的周一日期
@@ -96,7 +97,13 @@ function formatMonthLabel(monthKey: string): string {
 function getScopeKey(dateStr: string, scope: TaskScope): string {
   if (scope === 'weekly') return getWeekKey(dateStr);
   if (scope === 'monthly') return getMonthKey(dateStr);
+  if (scope === 'yearly') return dateStr.slice(0, 4); // YYYY
   return dateStr;
+}
+
+// 格式化年标识为中文：2026年
+function formatYearLabel(yearKey: string): string {
+  return `${yearKey}年`;
 }
 
 function formatDate(date: Date): string {
@@ -203,8 +210,10 @@ export default function Tasks() {
       d.setDate(d.getDate() + offset);
     } else if (scope === 'weekly') {
       d.setDate(d.getDate() + offset * 7);
-    } else {
+    } else if (scope === 'monthly') {
       d.setMonth(d.getMonth() + offset);
+    } else {
+      d.setFullYear(d.getFullYear() + offset);
     }
     setSelectedDate(formatDate(d));
   };
@@ -568,7 +577,9 @@ ${
                 ? (isToday(selectedDate) ? '今天' : formatDateCN(selectedDate))
                 : scope === 'weekly'
                   ? formatWeekLabel(getWeekKey(selectedDate))
-                  : formatMonthLabel(getMonthKey(selectedDate))
+                  : scope === 'monthly'
+                    ? formatMonthLabel(getMonthKey(selectedDate))
+                    : formatYearLabel(selectedDate.slice(0, 4))
               }
             </span>
           </button>
@@ -617,12 +628,14 @@ ${
           </div>
         )}
 
-        {/* Weekly/Monthly: show period label only, no calendar grid */}
-        {(scope === 'weekly' || scope === 'monthly') && (
+        {/* Weekly/Monthly/Yearly: show period label only, no calendar grid */}
+        {(scope === 'weekly' || scope === 'monthly' || scope === 'yearly') && (
           <div className="flex items-center justify-center py-3 text-sm text-text-secondary">
             {scope === 'weekly'
               ? `${formatWeekLabel(getWeekKey(selectedDate))}（周一至周日）`
-              : `${formatMonthLabel(getMonthKey(selectedDate))}（整月）`
+              : scope === 'monthly'
+                ? `${formatMonthLabel(getMonthKey(selectedDate))}（整月）`
+                : `${formatYearLabel(selectedDate.slice(0, 4))}（全年）`
             }
           </div>
         )}
@@ -635,7 +648,7 @@ ${
             <div className="flex items-center gap-2">
               <ListTodo size={16} className="text-gold" />
               <span className="text-sm text-text-primary font-medium">
-                {scope === 'daily' ? '今日进度' : scope === 'weekly' ? '本周进度' : '本月进度'}
+                {scope === 'daily' ? '今日进度' : scope === 'weekly' ? '本周进度' : scope === 'monthly' ? '本月进度' : '本年进度'}
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -720,7 +733,7 @@ ${
           </div>
 
           <button onClick={handleAddTask} disabled={!newTitle.trim()} className="btn-gold w-full py-2.5 text-sm disabled:opacity-40">
-            {scope === 'daily' ? `添加到 ${formatDateCN(selectedDate)}` : scope === 'weekly' ? `添加到 ${formatWeekLabel(getWeekKey(selectedDate))}` : `添加到 ${formatMonthLabel(getMonthKey(selectedDate))}`}
+            {scope === 'daily' ? `添加到 ${formatDateCN(selectedDate)}` : scope === 'weekly' ? `添加到 ${formatWeekLabel(getWeekKey(selectedDate))}` : scope === 'monthly' ? `添加到 ${formatMonthLabel(getMonthKey(selectedDate))}` : `添加到 ${formatYearLabel(selectedDate.slice(0, 4))}`}
           </button>
         </div>
       )}
@@ -731,14 +744,16 @@ ${
           <div className="card p-8 text-center">
             <ListTodo size={32} className="text-text-muted mx-auto mb-3" />
             <p className="text-text-muted text-sm">
-              {scope === 'daily' ? '今日暂无任务' : scope === 'weekly' ? '本周暂无任务' : '本月暂无任务'}
+              {scope === 'daily' ? '今日暂无任务' : scope === 'weekly' ? '本周暂无任务' : scope === 'monthly' ? '本月暂无任务' : '本年暂无任务'}
             </p>
             <p className="text-xs text-text-muted">
               {scope === 'daily'
                 ? formatDateCN(selectedDate)
                 : scope === 'weekly'
                   ? formatWeekLabel(getWeekKey(selectedDate))
-                  : formatMonthLabel(getMonthKey(selectedDate))
+                  : scope === 'monthly'
+                    ? formatMonthLabel(getMonthKey(selectedDate))
+                    : formatYearLabel(selectedDate.slice(0, 4))
               }
             </p>
             <button onClick={() => setShowAddForm(true)} className="mt-3 text-gold text-sm hover:underline">

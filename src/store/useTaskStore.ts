@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export type Quadrant = 'A' | 'B' | 'C' | 'D';
 export type TagType = 'industry' | 'macro' | 'strategy' | 'quant' | 'learning' | 'review' | 'output' | 'network';
-export type TaskScope = 'daily' | 'weekly' | 'monthly';
+export type TaskScope = 'daily' | 'weekly' | 'monthly' | 'yearly';
 
 export interface Task {
   id: string;

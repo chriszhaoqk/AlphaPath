@@ -36,7 +36,7 @@ const navItems = [
   { to: '/diary', icon: BookHeart, label: '个人日记' },
   { to: '/learning', icon: BookOpen, label: '学习追踪' },
   { to: '/journal', icon: PenLine, label: '投资笔记' },
-  { to: '/skills', icon: Radar, label: '技能雷达' },
+  { to: '/skills', icon: Radar, label: '通关测试' },
   { to: '/strategy', icon: Shield, label: '策略框架' },
   { to: '/settings', icon: Settings, label: '设置' },
 ];
