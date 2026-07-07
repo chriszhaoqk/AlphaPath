@@ -19,6 +19,7 @@ const ACCOUNT_CONFIG = [
   { key: 'fund' as const, label: '基金账户', color: '#10B981', bg: 'rgba(16,185,129,0.15)' },
   { key: 'primaryMarket' as const, label: '一级市场投资', color: '#D4A853', bg: 'rgba(212,168,83,0.15)' },
   { key: 'daily' as const, label: '日常账户', color: '#F472B6', bg: 'rgba(244,114,182,0.15)' },
+  { key: 'forex' as const, label: '外汇账户', color: '#C084FC', bg: 'rgba(192,132,252,0.15)' },
 ];
 
 function formatMoney(n: number): string {
@@ -42,7 +43,7 @@ export default function Funds() {
   const [currentMonth, setCurrentMonth] = useState(getLocalMonth());
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [form, setForm] = useState({ stock: '', fund: '', primaryMarket: '', daily: '', note: '' });
+  const [form, setForm] = useState({ stock: '', fund: '', primaryMarket: '', daily: '', forex: '', note: '' });
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const sortedRecords = useMemo(
@@ -65,10 +66,11 @@ export default function Funds() {
           fund: String(rec.fund),
           primaryMarket: String(rec.primaryMarket),
           daily: String(rec.daily),
+          forex: String(rec.forex),
           note: rec.note || '',
         });
       } else {
-        setForm({ stock: '', fund: '', primaryMarket: '', daily: '', note: '' });
+        setForm({ stock: '', fund: '', primaryMarket: '', daily: '', forex: '', note: '' });
       }
     }
   }, [showForm, editingId, currentRecord, records]);
@@ -101,7 +103,7 @@ export default function Funds() {
 
     // Data
     const months = sortedRecords.map((r) => r.month);
-    const totals = sortedRecords.map((r) => r.stock + r.fund + r.primaryMarket + r.daily);
+    const totals = sortedRecords.map((r) => r.stock + r.fund + r.primaryMarket + r.daily + r.forex);
     const maxVal = Math.max(...totals) * 1.1;
     const minVal = Math.min(...totals) * 0.9;
 
@@ -136,7 +138,7 @@ export default function Funds() {
     });
 
     // Draw each account line
-    const drawLine = (key: keyof Pick<FundRecord, 'stock' | 'fund' | 'primaryMarket' | 'daily'>, color: string) => {
+    const drawLine = (key: keyof Pick<FundRecord, 'stock' | 'fund' | 'primaryMarket' | 'daily' | 'forex'>, color: string) => {
       const vals = sortedRecords.map((r) => r[key] as number);
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
@@ -187,6 +189,7 @@ export default function Funds() {
     drawLine('fund', '#10B981');
     drawLine('primaryMarket', '#D4A853');
     drawLine('daily', '#F472B6');
+    drawLine('forex', '#C084FC');
   }, [sortedRecords]);
 
   const handleSave = () => {
@@ -196,6 +199,7 @@ export default function Funds() {
       fund: parseFloat(form.fund) || 0,
       primaryMarket: parseFloat(form.primaryMarket) || 0,
       daily: parseFloat(form.daily) || 0,
+      forex: parseFloat(form.forex) || 0,
       note: form.note,
     };
 
@@ -224,14 +228,14 @@ export default function Funds() {
   };
 
   const currentTotal = currentRecord
-    ? currentRecord.stock + currentRecord.fund + currentRecord.primaryMarket + currentRecord.daily
+    ? currentRecord.stock + currentRecord.fund + currentRecord.primaryMarket + currentRecord.daily + currentRecord.forex
     : 0;
 
   // Calculate change from previous month
   const prevMonth = shiftMonth(currentMonth, -1);
   const prevRecord = records.find((r) => r.month === prevMonth);
   const prevTotal = prevRecord
-    ? prevRecord.stock + prevRecord.fund + prevRecord.primaryMarket + prevRecord.daily
+    ? prevRecord.stock + prevRecord.fund + prevRecord.primaryMarket + prevRecord.daily + prevRecord.forex
     : 0;
   const change = currentTotal - prevTotal;
   const changePercent = prevTotal > 0 ? ((change / prevTotal) * 100).toFixed(1) : '--';
@@ -370,7 +374,7 @@ export default function Funds() {
           <h3 className="text-sm font-semibold text-text-primary mb-3">历史记录</h3>
           <div className="space-y-2">
             {[...sortedRecords].reverse().map((rec) => {
-              const total = rec.stock + rec.fund + rec.primaryMarket + rec.daily;
+              const total = rec.stock + rec.fund + rec.primaryMarket + rec.daily + rec.forex;
               return (
                 <div key={rec.id} className="flex items-center justify-between bg-[#0D1117] rounded-lg px-3 py-2.5">
                   <div className="flex items-center gap-3">
