@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import {
   Plus,
   ChevronLeft,
@@ -20,6 +20,7 @@ import {
   Building2,
   BookOpen,
   PenLine,
+  BarChart3,
 } from 'lucide-react';
 import { useTaskStore, type Quadrant, type TagType, type Task, type TaskScope } from '@/store/useTaskStore';
 import { useIndustryStore } from '@/store/useIndustryStore';
@@ -194,6 +195,9 @@ export default function Tasks() {
   const [shareTaskId, setShareTaskId] = useState<string | null>(null);
   const [shareSuccess, setShareSuccess] = useState('');
 
+  // Work time curve canvas ref
+  const timeChartCanvasRef = useRef<HTMLCanvasElement>(null);
+
   // Timer tick - force re-render every second for active timers
   const [, setTimerTick] = useState(0);
   useEffect(() => {
@@ -253,6 +257,165 @@ export default function Tasks() {
   const totalTimeSpent = useMemo(() => {
     return dayTasks.reduce((sum, t) => sum + getLiveTimeSpent(t), 0);
   }, [dayTasks]);
+
+  // 汇总当前scope周期内的每日任务工作时间（基于daily任务的timeSpent）
+  const aggregatedTimeSpent = useMemo(() => {
+    if (scope === 'daily') return totalTimeSpent;
+    const scopeKey = getScopeKey(selectedDate, scope);
+    return tasks
+      .filter((t) => t.scope === 'daily')
+      .filter((t) => {
+        if (scope === 'weekly') return getWeekKey(t.dueDate) === scopeKey;
+        if (scope === 'monthly') return getMonthKey(t.dueDate) === scopeKey;
+        if (scope === 'yearly') return t.dueDate.slice(0, 4) === scopeKey;
+        return false;
+      })
+      .reduce((sum, t) => sum + (t.timeSpent || 0), 0);
+  }, [tasks, scope, selectedDate, totalTimeSpent]);
+
+  // 获取当前scope周期内每天的工时数据（用于绘制曲线）
+  const timeSeriesData = useMemo(() => {
+    if (scope === 'daily') return [];
+    const scopeKey = getScopeKey(selectedDate, scope);
+    const dailyTasks = tasks.filter((t) => t.scope === 'daily');
+
+    let dateList: string[] = [];
+    if (scope === 'weekly') {
+      const ws = getWeekStart(selectedDate);
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(ws + 'T00:00:00');
+        d.setDate(d.getDate() + i);
+        dateList.push(formatDate(d));
+      }
+    } else if (scope === 'monthly') {
+      const d = new Date(selectedDate + 'T00:00:00');
+      const year = d.getFullYear();
+      const month = d.getMonth();
+      const lastDay = new Date(year, month + 1, 0).getDate();
+      for (let i = 1; i <= lastDay; i++) {
+        dateList.push(`${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`);
+      }
+    } else if (scope === 'yearly') {
+      const year = selectedDate.slice(0, 4);
+      for (let m = 1; m <= 12; m++) {
+        dateList.push(`${year}-${String(m).padStart(2, '0')}`);
+      }
+    }
+
+    return dateList.map((dateStr) => {
+      const total = dailyTasks
+        .filter((t) => {
+          if (scope === 'yearly') return getMonthKey(t.dueDate) === dateStr;
+          return t.dueDate === dateStr;
+        })
+        .reduce((sum, t) => sum + (t.timeSpent || 0), 0);
+      return { label: dateStr, value: total };
+    });
+  }, [tasks, scope, selectedDate]);
+
+  // 绘制工作时间曲线图（仅周/月/年视图）
+  useEffect(() => {
+    const canvas = timeChartCanvasRef.current;
+    if (!canvas || scope === 'daily' || timeSeriesData.length === 0) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+
+    const W = rect.width;
+    const H = rect.height;
+    const padL = 50;
+    const padR = 20;
+    const padT = 20;
+    const padB = 40;
+    const chartW = W - padL - padR;
+    const chartH = H - padT - padB;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // 数值转小时
+    const values = timeSeriesData.map((d) => d.value / 3600);
+    const maxVal = Math.max(...values, 1);
+    const niceMax = Math.ceil(maxVal * 1.15);
+
+    // 网格线 + Y 轴标签
+    ctx.strokeStyle = '#2A3040';
+    ctx.lineWidth = 1;
+    const gridLines = 4;
+    for (let i = 0; i <= gridLines; i++) {
+      const y = padT + (chartH / gridLines) * i;
+      ctx.beginPath();
+      ctx.moveTo(padL, y);
+      ctx.lineTo(padL + chartW, y);
+      ctx.stroke();
+
+      const val = niceMax - (niceMax / gridLines) * i;
+      ctx.fillStyle = '#5A6577';
+      ctx.font = '11px DM Sans';
+      ctx.textAlign = 'right';
+      ctx.fillText(`${val.toFixed(1)}h`, padL - 8, y + 4);
+    }
+
+    // X 轴标签（控制密度避免拥挤）
+    const step = chartW / (timeSeriesData.length - 1 || 1);
+    const labelStep = Math.max(1, Math.ceil(timeSeriesData.length / 8));
+    ctx.fillStyle = '#5A6577';
+    ctx.font = '11px DM Sans';
+    ctx.textAlign = 'center';
+    timeSeriesData.forEach((d, i) => {
+      if (i % labelStep !== 0 && i !== timeSeriesData.length - 1) return;
+      const x = padL + step * i;
+      let label = d.label;
+      if (scope === 'weekly') label = d.label.slice(5); // MM-DD
+      else if (scope === 'monthly') label = d.label.slice(8); // DD
+      else if (scope === 'yearly') label = d.label.slice(5); // MM
+      ctx.fillText(label, x, H - padB + 20);
+    });
+
+    // 渐变填充区域
+    const gradient = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+    gradient.addColorStop(0, 'rgba(212,168,83,0.35)');
+    gradient.addColorStop(1, 'rgba(212,168,83,0.02)');
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    values.forEach((v, i) => {
+      const x = padL + step * i;
+      const y = padT + chartH - (v / niceMax) * chartH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.lineTo(padL + chartW, padT + chartH);
+    ctx.lineTo(padL, padT + chartH);
+    ctx.closePath();
+    ctx.fill();
+
+    // 曲线
+    ctx.strokeStyle = '#D4A853';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    values.forEach((v, i) => {
+      const x = padL + step * i;
+      const y = padT + chartH - (v / niceMax) * chartH;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    // 数据点
+    values.forEach((v, i) => {
+      const x = padL + step * i;
+      const y = padT + chartH - (v / niceMax) * chartH;
+      ctx.fillStyle = v > 0 ? '#D4A853' : '#3A4050';
+      ctx.beginPath();
+      ctx.arc(x, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+  }, [timeSeriesData, scope]);
 
   // Daily summary
   const dailySummary = getDailySummary(selectedDate);
@@ -654,7 +817,10 @@ ${
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1 text-sm text-text-muted">
                 <Clock size={14} />
-                <span>{formatDurationCN(totalTimeSpent)}</span>
+                <span>{formatDurationCN(scope === 'daily' ? totalTimeSpent : aggregatedTimeSpent)}</span>
+                {scope !== 'daily' && (
+                  <span className="text-[10px] text-text-muted ml-1">（汇总自每日计时）</span>
+                )}
               </div>
               <span className="text-sm text-text-muted">
                 {completedCount}/{totalCount} 完成
@@ -670,6 +836,48 @@ ${
               }}
             />
           </div>
+        </div>
+      )}
+
+      {/* 工作时间曲线 - 仅周/月/年视图显示 */}
+      {scope !== 'daily' && (
+        <div className="card p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold text-text-primary flex items-center gap-2">
+              <BarChart3 size={16} className="text-gold" />
+              工作时间曲线
+            </h3>
+            <div className="flex items-center gap-1 text-xs text-text-muted">
+              <Clock size={12} />
+              <span>累计 {formatDurationCN(aggregatedTimeSpent)}</span>
+            </div>
+          </div>
+          {timeSeriesData.length === 0 || aggregatedTimeSpent === 0 ? (
+            <div className="text-center py-8 text-text-muted text-sm">
+              {scope === 'weekly'
+                ? '本周暂无每日计时数据'
+                : scope === 'monthly'
+                  ? '本月暂无每日计时数据'
+                  : '本年暂无每日计时数据'}
+              ，请在每日任务中开启计时
+            </div>
+          ) : (
+            <>
+              <canvas
+                ref={timeChartCanvasRef}
+                className="w-full"
+                style={{ height: '200px' }}
+              />
+              <div className="flex items-center justify-between mt-3 text-[11px] text-text-muted">
+                <span>
+                  {scope === 'weekly' ? '本周每日工时分布' : scope === 'monthly' ? '本月每日工时分布' : '本年每月工时分布'}
+                </span>
+                <span>
+                  峰值 {formatDurationCN(Math.max(...timeSeriesData.map((d) => d.value)))} · 平均 {formatDurationCN(Math.floor(aggregatedTimeSpent / timeSeriesData.length))}
+                </span>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -848,7 +1056,8 @@ ${
                         )}
                       </div>
 
-                      {/* Timer display + toggle */}
+                      {/* Timer display + toggle - 仅每日任务支持计时 */}
+                      {scope === 'daily' && (
                       <button
                         onClick={() => handleTimerToggle(task)}
                         disabled={task.completed}
@@ -864,8 +1073,10 @@ ${
                         {isTimerRunning ? <Pause size={12} /> : <Play size={12} />}
                         <span>{formatDuration(liveTime)}</span>
                       </button>
+                      )}
 
-                      {/* Manual time input */}
+                      {/* Manual time input - 仅每日任务支持手动录入 */}
+                      {scope === 'daily' && (
                       <button
                         onClick={() => openTimeInput(task)}
                         disabled={task.completed}
@@ -874,6 +1085,7 @@ ${
                       >
                         <Keyboard size={14} />
                       </button>
+                      )}
 
                       {/* Actions */}
                       <div className="flex items-center gap-0.5">
@@ -893,7 +1105,7 @@ ${
                     </div>
 
                     {/* Tags + description + time indicator */}
-                    {(task.tags.length > 0 || task.description || liveTime > 0) && (
+                    {(task.tags.length > 0 || task.description || (scope === 'daily' && liveTime > 0)) && (
                       <div className="flex items-center gap-2 mt-1.5 ml-8">
                         {task.tags.map((tag) => (
                           <span key={tag} className={`tag tag-${tag} text-[10px]`}>
@@ -903,13 +1115,13 @@ ${
                         {task.description && (
                           <span className="text-[10px] text-text-muted">📝 详情</span>
                         )}
-                        {!isTimerRunning && liveTime > 0 && (
+                        {scope === 'daily' && !isTimerRunning && liveTime > 0 && (
                           <span className="text-[10px] text-text-muted flex items-center gap-0.5">
                             <Timer size={10} />
                             {formatDurationCN(liveTime)}
                           </span>
                         )}
-                        {isTimerRunning && (
+                        {scope === 'daily' && isTimerRunning && (
                           <span className="text-[10px] text-gold flex items-center gap-0.5 animate-pulse">
                             <Timer size={10} />
                             计时中...
