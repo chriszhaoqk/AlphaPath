@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Bold,
@@ -399,7 +400,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
     { icon: Table, action: () => setShowTablePicker(true), title: '插入表格' },
   ];
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4"
     >
@@ -766,6 +767,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
