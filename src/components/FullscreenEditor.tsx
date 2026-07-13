@@ -59,46 +59,56 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   const dragStart = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 限制位置，确保标题栏始终可见
+  // 限制位置，确保标题栏始终可见（基于初始居中位置计算，不受 transform 影响）
   const clampPosition = useCallback((x: number, y: number) => {
     const container = containerRef.current;
     if (!container) return { x, y };
-    const rect = container.getBoundingClientRect();
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    // 标题栏高度约 44px，确保至少 44px 始终可见在顶部
-    // 允许左右移动但保留至少 100px 可见
-    const maxX = Math.max(0, (rect.width - 100) / 2 + (vw - rect.width) / 2);
+    // 使用 offsetWidth/offsetHeight 不受 transform 影响
+    const w = container.offsetWidth;
+    const h = container.offsetHeight;
+    // 弹窗居中时，左边缘到视口左边的距离
+    const centeredLeft = (vw - w) / 2;
+    const centeredTop = (vh - h) / 2;
+    // 允许左右移动，保留至少 120px 可见
+    const maxX = Math.max(0, w / 2 - 120);
     const minX = -maxX;
-    // 顶部不能超出视口（标题栏必须可见），底部不能完全拖出
-    const minY = -Math.floor((rect.height - 60) / 2) + (vh - rect.height) / 2;
-    const maxY = Math.floor((rect.height - 60) / 2) + (vh - rect.height) / 2;
+    // 顶部不能超出视口上边缘（标题栏必须可见），底部保留至少 60px
+    const minY = -centeredTop + 8;
+    const maxY = vh - centeredTop - h - 8;
     return {
       x: Math.max(minX, Math.min(maxX, x)),
       y: Math.max(minY, Math.min(maxY, y)),
     };
   }, []);
 
-  // 统一的拖拽起点处理（兼容鼠标和触摸）
-  const startDrag = useCallback((clientX: number, clientY: number, target: EventTarget | null) => {
-    if (!(target as HTMLElement).closest('[data-drag-handle]')) return;
+  // 标题栏拖拽起点（鼠标）
+  const handleHeaderMouseDown = useCallback((e: React.MouseEvent) => {
+    // 不拦截按钮点击
+    if ((e.target as HTMLElement).closest('button, select')) return;
+    e.preventDefault();
     setIsDragging(true);
     dragStart.current = {
-      x: clientX,
-      y: clientY,
+      x: e.clientX,
+      y: e.clientY,
       posX: position.x,
       posY: position.y,
     };
   }, [position]);
 
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    startDrag(e.clientX, e.clientY, e.target);
-  }, [startDrag]);
-
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+  // 标题栏拖拽起点（触摸）
+  const handleHeaderTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
-    startDrag(e.touches[0].clientX, e.touches[0].clientY, e.target);
-  }, [startDrag]);
+    if ((e.target as HTMLElement).closest('button, select')) return;
+    setIsDragging(true);
+    dragStart.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+      posX: position.x,
+      posY: position.y,
+    };
+  }, [position]);
 
   useEffect(() => {
     if (!isDragging) return;
@@ -392,8 +402,6 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4"
-      onMouseDown={handleDragStart}
-      onTouchStart={handleTouchStart}
     >
       <div
         ref={containerRef}
@@ -406,7 +414,9 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
         {/* Header - draggable */}
         <div
           data-drag-handle
-          className="flex items-center justify-between px-4 py-2.5 border-b border-border-custom flex-shrink-0 cursor-move select-none"
+          onMouseDown={handleHeaderMouseDown}
+          onTouchStart={handleHeaderTouchStart}
+          className={`flex items-center justify-between px-4 py-2.5 border-b border-border-custom flex-shrink-0 cursor-move select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         >
           <div className="flex items-center gap-2">
             <GripVertical size={16} className="text-text-muted" />
@@ -643,7 +653,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
 
         {/* Footer hint */}
         <div className="px-4 py-1.5 border-t border-border-custom text-xs text-text-muted flex justify-between flex-shrink-0">
-          <span>选中文本后可设置格式 | 点击「表格」插入表格 | Ctrl+V粘贴截图可拖拽缩放{parentId ? ' | 点击📎上传附件' : ''}</span>
+          <span>⠿ 拖拽顶部标题栏可移动窗口 | 选中文本设置格式 | Ctrl+V粘贴截图可缩放{parentId ? ' | 📎上传附件' : ''}</span>
           <span>附件限100MB以内</span>
         </div>
       </div>
