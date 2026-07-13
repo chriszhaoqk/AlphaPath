@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Book, GraduationCap, FileText, BarChart, Plus, Pencil, Trash2, X } from 'lucide-react';
 import { useLearningStore, type Learning } from '@/store/useLearningStore';
 import VoiceTextInput from '@/components/VoiceTextInput';
@@ -271,7 +272,7 @@ export default function LearningPage() {
       )}
 
       {/* Add/Edit Modal */}
-      {showModal && (
+      {showModal && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShowModal(false)}>
           <div
             className="card p-4 md:p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
@@ -376,7 +377,8 @@ export default function LearningPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

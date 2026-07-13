@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   BookHeart,
   Plus,
@@ -238,7 +239,7 @@ export default function DiaryPage() {
       )}
 
       {/* Add/Edit Form Modal */}
-      {showForm && (
+      {showForm && createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShowForm(false)}>
           <div className="card p-5 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
@@ -360,7 +361,8 @@ export default function DiaryPage() {
               保存日记
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Fullscreen Editor */}
