@@ -57,35 +57,80 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // 限制位置，确保标题栏始终可见
+  const clampPosition = useCallback((x: number, y: number) => {
+    const container = containerRef.current;
+    if (!container) return { x, y };
+    const rect = container.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    // 标题栏高度约 44px，确保至少 44px 始终可见在顶部
+    // 允许左右移动但保留至少 100px 可见
+    const maxX = Math.max(0, (rect.width - 100) / 2 + (vw - rect.width) / 2);
+    const minX = -maxX;
+    // 顶部不能超出视口（标题栏必须可见），底部不能完全拖出
+    const minY = -Math.floor((rect.height - 60) / 2) + (vh - rect.height) / 2;
+    const maxY = Math.floor((rect.height - 60) / 2) + (vh - rect.height) / 2;
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y)),
+    };
+  }, []);
+
+  // 统一的拖拽起点处理（兼容鼠标和触摸）
+  const startDrag = useCallback((clientX: number, clientY: number, target: EventTarget | null) => {
+    if (!(target as HTMLElement).closest('[data-drag-handle]')) return;
+    setIsDragging(true);
+    dragStart.current = {
+      x: clientX,
+      y: clientY,
+      posX: position.x,
+      posY: position.y,
+    };
+  }, [position]);
 
   const handleDragStart = useCallback((e: React.MouseEvent) => {
-    // 只通过拖拽手柄触发
-    if ((e.target as HTMLElement).closest('[data-drag-handle]')) {
-      setIsDragging(true);
-      dragStart.current = {
-        x: e.clientX,
-        y: e.clientY,
-        posX: position.x,
-        posY: position.y,
-      };
-    }
-  }, [position]);
+    startDrag(e.clientX, e.clientY, e.target);
+  }, [startDrag]);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    startDrag(e.touches[0].clientX, e.touches[0].clientY, e.target);
+  }, [startDrag]);
 
   useEffect(() => {
     if (!isDragging) return;
+
     const handleMove = (e: MouseEvent) => {
       const dx = e.clientX - dragStart.current.x;
       const dy = e.clientY - dragStart.current.y;
-      setPosition({ x: dragStart.current.posX + dx, y: dragStart.current.posY + dy });
+      setPosition(clampPosition(dragStart.current.posX + dx, dragStart.current.posY + dy));
     };
     const handleUp = () => setIsDragging(false);
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      e.preventDefault();
+      const t = e.touches[0];
+      const dx = t.clientX - dragStart.current.x;
+      const dy = t.clientY - dragStart.current.y;
+      setPosition(clampPosition(dragStart.current.posX + dx, dragStart.current.posY + dy));
+    };
+    const handleTouchEnd = () => setIsDragging(false);
+
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleTouchMove, { passive: false });
+    window.addEventListener('touchend', handleTouchEnd);
     return () => {
       window.removeEventListener('mousemove', handleMove);
       window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleTouchMove);
+      window.removeEventListener('touchend', handleTouchEnd);
     };
-  }, [isDragging]);
+  }, [isDragging, clampPosition]);
 
   // Attachments
   const { getAttachments, addAttachment, removeAttachment, updateAttachmentSummary } = useAttachmentStore();
@@ -345,9 +390,14 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onMouseDown={handleDragStart}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4"
+      onMouseDown={handleDragStart}
+      onTouchStart={handleTouchStart}
+    >
       <div
-        className="w-[92vw] max-w-4xl h-[88vh] bg-ink border border-border-custom rounded-xl flex flex-col shadow-2xl"
+        ref={containerRef}
+        className="w-full max-w-4xl h-[92vh] sm:h-[88vh] bg-ink border border-border-custom rounded-xl flex flex-col shadow-2xl"
         style={{
           transform: `translate(${position.x}px, ${position.y}px)`,
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',
