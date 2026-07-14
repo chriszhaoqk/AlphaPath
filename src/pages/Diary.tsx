@@ -182,7 +182,6 @@ export default function DiaryPage() {
               {items.map((diary) => {
                 const moodCfg = MOOD_CONFIG[diary.mood] || MOOD_CONFIG.neutral;
                 const MoodIcon = moodCfg.icon;
-                const preview = stripHtml(diary.content).slice(0, 80);
                 return (
                   <div key={diary.id} className="card p-4">
                     <div className="flex items-start justify-between mb-2">
@@ -217,8 +216,8 @@ export default function DiaryPage() {
                         </button>
                       </div>
                     </div>
-                    {preview && (
-                      <p className="text-xs text-text-secondary leading-relaxed line-clamp-2">{preview}</p>
+                    {diary.content && (
+                      <div className="prose-sm mt-1 text-xs text-text-secondary line-clamp-3" dangerouslySetInnerHTML={{ __html: diary.content }} />
                     )}
                     {diary.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-2">
@@ -226,9 +225,6 @@ export default function DiaryPage() {
                           <span key={tag} className="tag bg-gold/10 text-gold">{tag}</span>
                         ))}
                       </div>
-                    )}
-                    {diary.content && diary.content.includes('<') && (
-                      <div className="prose-sm mt-2 text-xs text-text-secondary line-clamp-3" dangerouslySetInnerHTML={{ __html: diary.content }} />
                     )}
                   </div>
                 );
