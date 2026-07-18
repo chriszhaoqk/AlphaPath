@@ -24,6 +24,11 @@ import {
   Mic,
   GripVertical,
   Table,
+  Undo2,
+  Redo2,
+  Palette,
+  Save,
+  Check,
 } from 'lucide-react';
 import { useAttachmentStore, generateAttachmentSummary, type Attachment } from '@/store/useAttachmentStore';
 import VoiceInput, { isVoiceSupported } from '@/components/VoiceInput';
@@ -160,6 +165,21 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
 
+  // 自动保存状态：null=未触发, 'auto'=自动保存, 'manual'=手动保存
+  const [saveHint, setSaveHint] = useState<{ type: 'auto' | 'manual'; at: number } | null>(null);
+  const lastSavedHtml = useRef<string>('');
+
+  // 字体颜色选择器
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const PRESET_COLORS = [
+    '#E8E8E8', '#9CA3AF', '#D4A853', '#F59E0B',
+    '#EF4444', '#EC4899', '#A855F7', '#3B82F6',
+    '#10B981', '#14B8A6', '#6366F1', '#FFFFFF',
+  ];
+
+  // 表格编辑菜单：点击单元格时弹出
+  const [tableMenu, setTableMenu] = useState<{ x: number; y: number; cell: HTMLTableCellElement } | null>(null);
+
   // Insert table into editor
   const insertTable = useCallback(() => {
     if (!editorRef.current) return;
@@ -208,6 +228,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
       } else {
         editorRef.current.innerHTML = '';
       }
+      lastSavedHtml.current = editorRef.current.innerHTML;
       updateWordCount();
     }
   }, []);
@@ -264,9 +285,185 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
     }
   };
 
-  const handleSave = () => {
+  const handleSave = (type: 'auto' | 'manual' = 'manual') => {
     const html = editorRef.current?.innerHTML || '';
+    if (type === 'auto' && html === lastSavedHtml.current) return; // 无变化不保存
     onSave(html);
+    lastSavedHtml.current = html;
+    setSaveHint({ type, at: Date.now() });
+    if (type === 'manual') {
+      setTimeout(() => setSaveHint(null), 2000);
+    }
+  };
+
+  // 自动保存：每30秒检查一次
+  useEffect(() => {
+    const timer = setInterval(() => {
+      handleSave('auto');
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // 关闭前自动保存
+  useEffect(() => {
+    return () => {
+      const html = editorRef.current?.innerHTML || '';
+      if (html && html !== lastSavedHtml.current) {
+        onSave(html);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 字体颜色
+  const handleForeColor = (color: string) => {
+    editorRef.current?.focus();
+    document.execCommand('foreColor', false, color);
+    setShowColorPicker(false);
+    updateWordCount();
+  };
+
+  // 撤销/重做
+  const handleUndo = () => {
+    editorRef.current?.focus();
+    document.execCommand('undo', false);
+    updateWordCount();
+  };
+  const handleRedo = () => {
+    editorRef.current?.focus();
+    document.execCommand('redo', false);
+    updateWordCount();
+  };
+
+  // 键盘快捷键：Ctrl+Z 撤销, Ctrl+Y / Ctrl+Shift+Z 重做, Ctrl+S 保存
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.ctrlKey || e.metaKey) {
+      if (e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.key === 'y') || (e.key === 'z' && e.shiftKey)) {
+        e.preventDefault();
+        handleRedo();
+      } else if (e.key === 's') {
+        e.preventDefault();
+        handleSave('manual');
+      }
+    }
+  };
+
+  // 点击外部关闭颜色选择器
+  useEffect(() => {
+    if (!showColorPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-color-picker]')) {
+        setShowColorPicker(false);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', handler), 0);
+    return () => document.removeEventListener('click', handler);
+  }, [showColorPicker]);
+
+  // 表格操作工具条：点击表格单元格时显示
+  const [tableToolbar, setTableToolbar] = useState<{ rowIdx: number; colIdx: number } | null>(null);
+
+  // 点击编辑器内表格单元格时显示工具条
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const handleClick = (e: Event) => {
+      const target = e.target as HTMLElement;
+      const cell = target.closest('td, th') as HTMLTableCellElement | null;
+      const table = target.closest('table') as HTMLTableElement | null;
+      if (cell && table && target.closest('[contenteditable]')) {
+        const rowIdx = Array.from(table.rows).indexOf(cell.parentElement as HTMLTableRowElement);
+        const colIdx = Array.from((cell.parentElement as HTMLTableRowElement).cells).indexOf(cell);
+        setTableToolbar({ rowIdx, colIdx });
+      } else {
+        setTableToolbar(null);
+      }
+    };
+    editor.addEventListener('click', handleClick);
+    return () => editor.removeEventListener('click', handleClick);
+  }, []);
+
+  // 表格增删行列操作
+  const tableAddRowBelow = () => {
+    if (!tableToolbar) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    const table = editor.querySelector('table');
+    if (!table) return;
+    const refRow = table.rows[tableToolbar.rowIdx];
+    if (!refRow) return;
+    const cols = refRow.cells.length;
+    const newRow = table.insertRow(tableToolbar.rowIdx + 1);
+    for (let c = 0; c < cols; c++) {
+      const cell = newRow.insertCell();
+      cell.style.border = '1px solid #2A3040';
+      cell.style.padding = '6px 10px';
+      cell.style.fontSize = '0.9em';
+      cell.innerHTML = '&nbsp;';
+    }
+    setTableToolbar(null);
+    updateWordCount();
+  };
+
+  const tableDeleteRow = () => {
+    if (!tableToolbar) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    const table = editor.querySelector('table');
+    if (!table) return;
+    if (table.rows.length <= 1) return; // 至少保留一行
+    table.deleteRow(tableToolbar.rowIdx);
+    setTableToolbar(null);
+    updateWordCount();
+  };
+
+  const tableAddColRight = () => {
+    if (!tableToolbar) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    const table = editor.querySelector('table');
+    if (!table) return;
+    for (let r = 0; r < table.rows.length; r++) {
+      const row = table.rows[r];
+      const isHeader = row.cells[0]?.tagName === 'TH';
+      const cell = row.insertCell(tableToolbar.colIdx + 1);
+      if (isHeader) {
+        const th = document.createElement('th');
+        th.style.border = '1px solid #2A3040';
+        th.style.padding = '6px 10px';
+        th.style.background = '#1A1F2E';
+        th.style.color = '#D4A853';
+        th.style.fontSize = '0.9em';
+        th.style.textAlign = 'left';
+        th.textContent = '标题';
+        cell.replaceWith(th);
+      } else {
+        cell.style.border = '1px solid #2A3040';
+        cell.style.padding = '6px 10px';
+        cell.style.fontSize = '0.9em';
+        cell.innerHTML = '&nbsp;';
+      }
+    }
+    setTableToolbar(null);
+    updateWordCount();
+  };
+
+  const tableDeleteCol = () => {
+    if (!tableToolbar) return;
+    const editor = editorRef.current;
+    if (!editor) return;
+    const table = editor.querySelector('table');
+    if (!table) return;
+    const colCount = table.rows[0]?.cells.length || 0;
+    if (colCount <= 1) return; // 至少保留一列
+    for (let r = 0; r < table.rows.length; r++) {
+      table.rows[r].deleteCell(tableToolbar.colIdx);
+    }
+    setTableToolbar(null);
+    updateWordCount();
   };
 
   // Paste image handler
@@ -386,6 +583,9 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   };
 
   const TOOLBAR_ITEMS = [
+    { icon: Undo2, action: handleUndo, title: '撤销 (Ctrl+Z)' },
+    { icon: Redo2, action: handleRedo, title: '重做 (Ctrl+Y)' },
+    { sep: true },
     { icon: Bold, cmd: 'bold', title: '加粗' },
     { icon: Italic, cmd: 'italic', title: '斜体' },
     { icon: Underline, cmd: 'underline', title: '下划线' },
@@ -425,13 +625,19 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
           </div>
           <div className="flex items-center gap-3">
             <span className="text-xs text-text-muted">{wordCount} 字</span>
+            {saveHint && (
+              <span className="text-xs text-positive flex items-center gap-1">
+                <Check size={12} />
+                {saveHint.type === 'auto' ? '已自动保存' : '已保存'}
+              </span>
+            )}
             {attachments.length > 0 && (
               <span className="text-xs text-text-muted flex items-center gap-1">
                 <Paperclip size={12} />
                 {attachments.length}
               </span>
             )}
-            <button onClick={handleSave} className="btn-gold text-sm px-4 py-1.5">
+            <button onClick={() => handleSave('manual')} className="btn-gold text-sm px-4 py-1.5">
               完成
             </button>
             <button onClick={onClose} className="p-1 text-text-muted hover:text-text-primary transition-colors">
@@ -495,6 +701,31 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
             <option value="blockquote">引用</option>
           </select>
 
+          {/* 字体颜色 */}
+          <div className="relative" data-color-picker>
+            <button
+              onClick={() => setShowColorPicker(!showColorPicker)}
+              className="p-1.5 rounded text-text-secondary hover:text-gold hover:bg-gold/10 transition-colors flex items-center gap-0.5"
+              title="字体颜色"
+            >
+              <Palette size={15} />
+              <span className="w-2 h-2 rounded-sm bg-gold inline-block" />
+            </button>
+            {showColorPicker && (
+              <div className="absolute top-full left-0 mt-1 p-2 bg-ink border border-border-custom rounded-lg shadow-xl z-10 grid grid-cols-6 gap-1">
+                {PRESET_COLORS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => handleForeColor(c)}
+                    className="w-6 h-6 rounded border border-border-custom hover:scale-110 transition-transform"
+                    style={{ background: c }}
+                    title={c}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Voice input button */}
           <div className="w-px h-5 bg-border-custom mx-1.5" />
           <VoiceInput
@@ -528,7 +759,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
         </div>
 
         {/* Editor + Attachments area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           {/* Editor */}
           <div
             ref={editorRef}
@@ -536,9 +767,31 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
             suppressContentEditableWarning
             onInput={updateWordCount}
             onPaste={handlePaste}
+            onKeyDown={handleKeyDown}
             className="flex-1 overflow-y-auto px-5 py-4 text-text-primary leading-relaxed focus:outline-none"
             style={{ fontSize: `${fontSize}px` }}
           />
+
+          {/* 表格操作工具条 */}
+          {tableToolbar && (
+            <div
+              data-table-toolbar
+              className="absolute top-2 right-2 flex items-center gap-1 bg-[#0D1117] border border-gold/40 rounded-lg px-2 py-1 shadow-xl z-20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="text-xs text-text-muted px-1">表格</span>
+              <div className="w-px h-4 bg-border-custom" />
+              <button onClick={tableAddRowBelow} className="text-xs text-text-secondary hover:text-gold px-1.5 py-0.5 hover:bg-gold/10 rounded" title="在下方插入行">+行</button>
+              <button onClick={tableDeleteRow} className="text-xs text-text-secondary hover:text-urgent px-1.5 py-0.5 hover:bg-urgent/10 rounded" title="删除当前行">-行</button>
+              <div className="w-px h-4 bg-border-custom" />
+              <button onClick={tableAddColRight} className="text-xs text-text-secondary hover:text-gold px-1.5 py-0.5 hover:bg-gold/10 rounded" title="在右侧插入列">+列</button>
+              <button onClick={tableDeleteCol} className="text-xs text-text-secondary hover:text-urgent px-1.5 py-0.5 hover:bg-urgent/10 rounded" title="删除当前列">-列</button>
+              <div className="w-px h-4 bg-border-custom" />
+              <button onClick={() => setTableToolbar(null)} className="text-text-muted hover:text-text-primary px-1" title="关闭">
+                <X size={12} />
+              </button>
+            </div>
+          )}
 
           {/* Attachments section */}
           {attachments.length > 0 && (
@@ -654,7 +907,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
 
         {/* Footer hint */}
         <div className="px-4 py-1.5 border-t border-border-custom text-xs text-text-muted flex justify-between flex-shrink-0">
-          <span>⠿ 拖拽顶部标题栏可移动窗口 | 选中文本设置格式 | Ctrl+V粘贴截图可缩放{parentId ? ' | 📎上传附件' : ''}</span>
+          <span>⠿ 拖拽顶部标题栏可移动窗口 | Ctrl+Z撤销 Ctrl+S保存 | 点击表格单元格可增删行列 | Ctrl+V粘贴截图{parentId ? ' | 📎附件' : ''}</span>
           <span>附件限100MB以内</span>
         </div>
       </div>
