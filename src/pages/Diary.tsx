@@ -16,6 +16,7 @@ import {
   Frown,
   Meh,
   Smile,
+  ChevronRight,
 } from 'lucide-react';
 import { useDiaryStore, type Diary } from '@/store/useDiaryStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
@@ -46,6 +47,7 @@ export default function DiaryPage() {
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorContent, setEditorContent] = useState('');
 
@@ -183,47 +185,68 @@ export default function DiaryPage() {
                 const moodCfg = MOOD_CONFIG[diary.mood] || MOOD_CONFIG.neutral;
                 const MoodIcon = moodCfg.icon;
                 return (
-                  <div key={diary.id} className="card p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <MoodIcon size={14} style={{ color: moodCfg.color }} />
-                          <h4 className="text-sm font-semibold text-text-primary truncate">{diary.title}</h4>
+                  <div key={diary.id} className="card overflow-hidden">
+                    <div
+                      className="p-3 md:p-4 cursor-pointer"
+                      onClick={() => setExpandedId(expandedId === diary.id ? null : diary.id)}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 mt-0.5">
+                          <MoodIcon size={16} style={{ color: moodCfg.color }} />
                         </div>
-                        <div className="flex items-center gap-2 text-xs text-text-muted">
-                          <Calendar size={11} />
-                          <span>{diary.date}</span>
-                          {diary.weather && (() => {
-                            const w = WEATHER_OPTIONS.find((o) => o.value === diary.weather);
-                            if (!w) return null;
-                            const WIcon = w.icon;
-                            return <WIcon size={11} style={{ color: w.color }} />;
-                          })()}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <h4 className="text-sm font-semibold text-text-primary truncate">{diary.title}</h4>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-text-muted">
+                            <Calendar size={11} />
+                            <span>{diary.date}</span>
+                            {diary.weather && (() => {
+                              const w = WEATHER_OPTIONS.find((o) => o.value === diary.weather);
+                              if (!w) return null;
+                              const WIcon = w.icon;
+                              return <WIcon size={11} style={{ color: w.color }} />;
+                            })()}
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => openEditForm(diary)}
-                          className="p-1.5 text-text-muted hover:text-gold transition-colors"
-                        >
-                          <Edit3 size={14} />
-                        </button>
-                        <button
-                          onClick={() => deleteDiary(diary.id)}
-                          className="p-1.5 text-text-muted hover:text-urgent transition-colors"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <ChevronRight
+                          size={16}
+                          className={`text-text-muted transition-transform flex-shrink-0 ${expandedId === diary.id ? 'rotate-90' : ''}`}
+                        />
                       </div>
                     </div>
-                    {diary.content && (
-                      <div className="prose-sm mt-1 text-xs text-text-secondary line-clamp-3" dangerouslySetInnerHTML={{ __html: diary.content }} />
-                    )}
-                    {diary.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-2">
-                        {diary.tags.map((tag) => (
-                          <span key={tag} className="tag bg-gold/10 text-gold">{tag}</span>
-                        ))}
+
+                    {/* 展开内容 */}
+                    {expandedId === diary.id && (
+                      <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-3 border-t border-border-custom pt-3">
+                        {diary.content ? (
+                          <div className="prose-sm text-sm text-text-primary" dangerouslySetInnerHTML={{ __html: diary.content }} />
+                        ) : (
+                          <p className="text-xs text-text-muted">暂无内容</p>
+                        )}
+                        {diary.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {diary.tags.map((tag) => (
+                              <span key={tag} className="tag bg-gold/10 text-gold">{tag}</span>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-custom">
+                          <button
+                            onClick={() => openEditForm(diary)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-gold/10 text-gold hover:bg-gold/20 transition-colors"
+                          >
+                            <Edit3 size={12} />
+                            编辑
+                          </button>
+                          <button
+                            onClick={() => deleteDiary(diary.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-urgent/10 text-urgent hover:bg-urgent/20 transition-colors"
+                          >
+                            <Trash2 size={12} />
+                            删除
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>

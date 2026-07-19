@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Book, GraduationCap, FileText, BarChart, Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Book, GraduationCap, FileText, BarChart, Plus, Pencil, Trash2, X, ChevronRight } from 'lucide-react';
 import { useLearningStore, type Learning } from '@/store/useLearningStore';
 import VoiceTextInput from '@/components/VoiceTextInput';
 
@@ -45,6 +45,7 @@ export default function LearningPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<LearningFormData>(emptyForm);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchLearnings();
@@ -125,13 +126,6 @@ export default function LearningPage() {
     await deleteLearning(id);
   };
 
-  const getTypeIcon = (type: string) => {
-    const config = TYPE_CONFIG[type as LearningType];
-    if (!config) return <Book size={18} />;
-    const Icon = config.icon;
-    return <Icon size={18} style={{ color: config.color }} />;
-  };
-
   return (
     <div className="animate-fade-in-up space-y-4 md:space-y-6">
       {/* Header */}
@@ -186,62 +180,80 @@ export default function LearningPage() {
         <div className="card p-5 md:p-8 text-center text-text-secondary">暂无学习记录</div>
       ) : (
         <div className="space-y-3">
-          {filteredLearnings.map((learning) => (
-            <div
-              key={learning.id}
-              className="card p-3 md:p-4 group cursor-pointer"
-              onClick={() => openEditModal(learning)}
-            >
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 flex-shrink-0">{getTypeIcon(learning.type)}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-semibold text-text-primary truncate">
-                      {learning.title}
-                    </h3>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2 flex-shrink-0">
-                      <button
-                        onClick={(e) => { e.stopPropagation(); openEditModal(learning); }}
-                        className="p-1 rounded hover:bg-gold/10 text-text-muted hover:text-gold transition-colors"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDelete(learning.id); }}
-                        className="p-1 rounded hover:bg-urgent/10 text-text-muted hover:text-urgent transition-colors"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+          {filteredLearnings.map((learning) => {
+            const cfg = TYPE_CONFIG[learning.type as LearningType] || TYPE_CONFIG.book;
+            const TypeIcon = cfg.icon;
+            return (
+              <div key={learning.id} className="card overflow-hidden">
+                <div
+                  className="p-3 md:p-4 cursor-pointer"
+                  onClick={() => setExpandedId(expandedId === learning.id ? null : learning.id)}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 mt-0.5">
+                      <TypeIcon size={16} style={{ color: cfg.color }} />
                     </div>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="flex-1 h-1.5 bg-border-custom rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gold rounded-full transition-all duration-300"
-                        style={{ width: `${learning.progress}%` }}
-                      />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h4 className="text-sm font-semibold text-text-primary truncate">{learning.title}</h4>
+                        <span className="tag text-xs border bg-gold/10 text-gold border-gold/30">{cfg.label}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-text-muted">
+                        <span>进度 {learning.progress}%</span>
+                        {learning.start_date && <span>开始: {learning.start_date}</span>}
+                        {learning.completed_date && <span className="text-positive">完成: {learning.completed_date}</span>}
+                      </div>
                     </div>
-                    <span className="text-xs text-text-secondary w-10 text-right">{learning.progress}%</span>
+                    <ChevronRight
+                      size={16}
+                      className={`text-text-muted transition-transform flex-shrink-0 ${expandedId === learning.id ? 'rotate-90' : ''}`}
+                    />
                   </div>
-
-                  {/* Date and notes */}
-                  <div className="flex items-center gap-3 text-xs text-text-muted">
-                    {learning.start_date && (
-                      <span>开始: {learning.start_date}</span>
-                    )}
-                    {learning.completed_date && (
-                      <span className="text-positive">完成: {learning.completed_date}</span>
-                    )}
-                  </div>
-                  {learning.notes && (
-                    <div className="text-xs text-text-secondary mt-1.5 line-clamp-2 prose-sm" dangerouslySetInnerHTML={{ __html: learning.notes }} />
-                  )}
                 </div>
+
+                {/* 展开内容 */}
+                {expandedId === learning.id && (
+                  <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-3 border-t border-border-custom pt-3">
+                    {/* 进度条 */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-border-custom rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gold rounded-full transition-all duration-300"
+                          style={{ width: `${learning.progress}%` }}
+                        />
+                      </div>
+                      <span className="text-xs text-text-secondary w-10 text-right">{learning.progress}%</span>
+                    </div>
+
+                    {/* 笔记内容 */}
+                    {learning.notes ? (
+                      <div className="prose-sm text-sm text-text-primary" dangerouslySetInnerHTML={{ __html: learning.notes }} />
+                    ) : (
+                      <p className="text-xs text-text-muted">暂无笔记</p>
+                    )}
+
+                    {/* 操作按钮 */}
+                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-border-custom">
+                      <button
+                        onClick={() => openEditModal(learning)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-gold/10 text-gold hover:bg-gold/20 transition-colors"
+                      >
+                        <Pencil size={12} />
+                        编辑
+                      </button>
+                      <button
+                        onClick={() => handleDelete(learning.id)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-urgent/10 text-urgent hover:bg-urgent/20 transition-colors"
+                      >
+                        <Trash2 size={12} />
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
