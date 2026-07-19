@@ -190,6 +190,10 @@ function StrategyCard({
             setEditValues(prev => ({ ...prev, [editorField]: val }));
             setEditorOpen(false);
           }}
+          onAutoSave={(val) => {
+            setEditorValue(val);
+            setEditValues(prev => ({ ...prev, [editorField]: val }));
+          }}
           onClose={() => setEditorOpen(false)}
         />
       )}

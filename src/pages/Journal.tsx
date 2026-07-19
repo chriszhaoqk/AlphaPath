@@ -468,6 +468,10 @@ export default function JournalPage() {
             setForm(prev => ({ ...prev, [editorField]: val }));
             setEditorOpen(false);
           }}
+          onAutoSave={(val) => {
+            setEditorValue(val);
+            setForm(prev => ({ ...prev, [editorField]: val }));
+          }}
           onClose={() => setEditorOpen(false)}
         />
       )}

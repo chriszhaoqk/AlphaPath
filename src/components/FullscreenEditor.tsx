@@ -36,8 +36,9 @@ import VoiceInput, { isVoiceSupported } from '@/components/VoiceInput';
 interface FullscreenEditorProps {
   label: string;
   value: string;
-  onSave: (html: string) => void;
+  onSave: (html: string) => void;           // 手动保存（点击完成/Ctrl+S），调用方应关闭窗口
   onClose: () => void;
+  onAutoSave?: (html: string) => void;      // 自动保存（30秒/关闭前），调用方仅更新内容，不应关闭窗口
   parentId?: string; // for attachments, e.g. "industry-abc123"
 }
 
@@ -53,7 +54,7 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
-export default function FullscreenEditor({ label, value, onSave, onClose, parentId }: FullscreenEditorProps) {
+export default function FullscreenEditor({ label, value, onSave, onClose, onAutoSave, parentId }: FullscreenEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fontSize, setFontSize] = useState(14);
@@ -288,7 +289,13 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
   const handleSave = (type: 'auto' | 'manual' = 'manual') => {
     const html = editorRef.current?.innerHTML || '';
     if (type === 'auto' && html === lastSavedHtml.current) return; // 无变化不保存
-    onSave(html);
+    if (type === 'auto') {
+      // 自动保存：仅同步内容到父组件状态，不关闭窗口
+      onAutoSave?.(html);
+    } else {
+      // 手动保存：调用方负责关闭窗口
+      onSave(html);
+    }
     lastSavedHtml.current = html;
     setSaveHint({ type, at: Date.now() });
     if (type === 'manual') {
@@ -304,12 +311,14 @@ export default function FullscreenEditor({ label, value, onSave, onClose, parent
     return () => clearInterval(timer);
   }, []);
 
-  // 关闭前自动保存
+  // 关闭前自动保存（不关闭窗口，仅同步内容；若手动点完成则 onSave 已处理）
   useEffect(() => {
     return () => {
       const html = editorRef.current?.innerHTML || '';
       if (html && html !== lastSavedHtml.current) {
-        onSave(html);
+        // 优先用 onAutoSave（不触发关闭），无则回退到 onSave
+        if (onAutoSave) onAutoSave(html);
+        else onSave(html);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -1183,6 +1183,10 @@ ${
             await updateTask(editorTaskId!, { description: val });
             setEditorOpen(false);
           }}
+          onAutoSave={async (val) => {
+            setEditorValue(val);
+            await updateTask(editorTaskId!, { description: val });
+          }}
           onClose={() => setEditorOpen(false)}
         />
       )}

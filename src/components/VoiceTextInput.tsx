@@ -124,6 +124,11 @@ export default function VoiceTextInput({
     setFullscreenOpen(false);
   }, [onChange]);
 
+  // 自动保存：仅同步内容到外层 state，不关闭窗口
+  const handleFullscreenAutoSave = useCallback((html: string) => {
+    onChange(html);
+  }, [onChange]);
+
   const baseInputClass =
     'w-full bg-[#0D1117] border border-[#2A3040] rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-gold/50 transition-colors pr-[72px]';
 
@@ -212,6 +217,7 @@ export default function VoiceTextInput({
           label={label || '编辑内容'}
           value={value}
           onSave={handleFullscreenSave}
+          onAutoSave={handleFullscreenAutoSave}
           onClose={() => setFullscreenOpen(false)}
           parentId={parentId}
         />

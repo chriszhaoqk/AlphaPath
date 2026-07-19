@@ -98,6 +98,11 @@ export default function DiaryPage() {
     setEditorOpen(false);
   };
 
+  // 自动保存：仅同步内容，不关闭窗口
+  const handleEditorAutoSave = (html: string) => {
+    setEditorContent(html);
+  };
+
   const handleSave = () => {
     if (!formTitle.trim()) return;
     const tags = formTags.split(/[,，]/).map((t) => t.trim()).filter(Boolean);
@@ -390,6 +395,7 @@ export default function DiaryPage() {
           label="日记内容"
           value={editorContent}
           onSave={handleEditorSave}
+          onAutoSave={handleEditorAutoSave}
           onClose={() => setEditorOpen(false)}
         />
       )}
