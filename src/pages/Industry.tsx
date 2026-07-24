@@ -1,5 +1,5 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
-import { FileText, Plus, PenLine, Trash2, X, ChevronRight, CheckCircle2, Circle, Tag } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { FileText, Plus, PenLine, Trash2, X, ChevronRight, CheckCircle2, Circle, Tag, Save, Check } from 'lucide-react';
 import { useIndustryStore, type IndustryResearch } from '@/store/useIndustryStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
 import VoiceTextInput from '@/components/VoiceTextInput';
@@ -53,6 +53,14 @@ export default function IndustryPage() {
   const [editorField, setEditorField] = useState<keyof Pick<ResearchFormData, 'summary' | 'keyFindings' | 'investmentImplications'>>('summary');
   const [editorValue, setEditorValue] = useState('');
 
+  // 草稿自动保存
+  const [autoSaveHint, setAutoSaveHint] = useState<{ at: number } | null>(null);
+  // 用 ref 跟踪 form / editingId 最新值，避免定时器闭包陷阱
+  const formRef = useRef(form);
+  const editingIdRef = useRef(editingId);
+  useEffect(() => { formRef.current = form; }, [form]);
+  useEffect(() => { editingIdRef.current = editingId; }, [editingId]);
+
   // Current attachment parent ID (use editingId if editing, otherwise draftId for new)
   const currentParentId = editingId ? `industry-${editingId}` : `industry-${draftId}`;
 
@@ -76,6 +84,44 @@ export default function IndustryPage() {
   useEffect(() => {
     fetchResearches();
   }, [fetchResearches]);
+
+  // 草稿自动保存：写纪要视图下每30秒静默保存一次（防闪退/断电）
+  useEffect(() => {
+    if (activeTab !== 'write') return;
+    const timer = setInterval(() => {
+      handleAutoSaveDraft(true);
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [activeTab, handleAutoSaveDraft]);
+
+  // 闪退保护：页面卸载 / 关闭时若仍在写纪要且有内容，立即存草稿
+  useEffect(() => {
+    if (activeTab !== 'write') return;
+    const handler = () => {
+      const f = formRef.current;
+      if (!f.title || !f.title.trim()) return;
+      const payload = {
+        title: f.title.trim(),
+        industry: f.industry,
+        subIndustry: f.subIndustry || undefined,
+        date: f.date,
+        participants: f.participants || undefined,
+        summary: f.summary,
+        keyFindings: f.keyFindings,
+        investmentImplications: f.investmentImplications,
+        status: 'draft' as const,
+        tags: f.tags,
+      };
+      const curId = editingIdRef.current;
+      if (curId) {
+        updateResearch(curId, payload);
+      } else {
+        addResearch(payload);
+      }
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [activeTab, addResearch, updateResearch]);
 
   const filteredResearches = useMemo(() => {
     return researches.filter((r) => {
@@ -182,6 +228,47 @@ export default function IndustryPage() {
     if (expandedId === id) setExpandedId(null);
   };
 
+  // 草稿自动保存：将当前表单内容以 draft 状态保存
+  // - 已有 editingId：更新该条记录为草稿
+  // - 新建：创建一条草稿，并把返回的 id 赋给 editingId（后续自动保存复用同一条）
+  // - 标题为空则跳过（无意义内容不保存）
+  const handleAutoSaveDraft = useCallback(async (silent = true): Promise<void> => {
+    const f = formRef.current;
+    if (!f.title || !f.title.trim()) return; // 无标题不保存
+    const payload = {
+      title: f.title.trim(),
+      industry: f.industry,
+      subIndustry: f.subIndustry || undefined,
+      date: f.date,
+      participants: f.participants || undefined,
+      summary: f.summary,
+      keyFindings: f.keyFindings,
+      investmentImplications: f.investmentImplications,
+      status: 'draft' as const,
+      tags: f.tags,
+    };
+    const curId = editingIdRef.current;
+    if (curId) {
+      await updateResearch(curId, payload);
+    } else {
+      const newId = await addResearch(payload);
+      editingIdRef.current = newId;
+      setEditingId(newId);
+    }
+    setAutoSaveHint({ at: Date.now() });
+    if (!silent) {
+      setTimeout(() => setAutoSaveHint(null), 2500);
+    }
+  }, [addResearch, updateResearch]);
+
+  // 退出写纪要视图：自动存草稿后返回列表
+  const handleExitWrite = useCallback(async () => {
+    await handleAutoSaveDraft(false);
+    setActiveTab('list');
+    setEditingId(null);
+    setForm(emptyForm);
+  }, [handleAutoSaveDraft]);
+
   const handlePublish = async (id: string) => {
     await publishResearch(id);
   };
@@ -244,7 +331,7 @@ export default function IndustryPage() {
       {/* Tabs */}
       <div className="flex gap-1 bg-card rounded-lg p-1 border border-border-custom">
         <button
-          onClick={() => { setActiveTab('list'); setEditingId(null); setForm(emptyForm); }}
+          onClick={() => handleExitWrite()}
           className={`flex-1 py-2 text-sm rounded-md transition-all ${
             activeTab === 'list'
               ? 'bg-gold/15 text-gold font-semibold'
@@ -415,12 +502,27 @@ export default function IndustryPage() {
       {activeTab === 'write' && (
         <div className="card p-4 md:p-5 space-y-3 md:space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold text-text-primary font-display">
-              {editingId ? '编辑纪要' : '新建产业调研纪要'}
-            </h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-bold text-text-primary font-display">
+                {editingId ? '编辑纪要' : '新建产业调研纪要'}
+              </h2>
+              {autoSaveHint && (
+                <span className="text-xs text-positive flex items-center gap-1 animate-fade-in-up">
+                  <Check size={12} />
+                  已自动保存到草稿箱
+                </span>
+              )}
+              {!autoSaveHint && (
+                <span className="text-xs text-text-muted flex items-center gap-1">
+                  <Save size={11} />
+                  每30秒自动存草稿
+                </span>
+              )}
+            </div>
             <button
-              onClick={() => { setActiveTab('list'); setEditingId(null); setForm(emptyForm); }}
+              onClick={() => handleExitWrite()}
               className="text-text-muted hover:text-text-primary"
+              title="退出并自动保存草稿"
             >
               <X size={20} />
             </button>
@@ -560,7 +662,7 @@ export default function IndustryPage() {
           {/* Actions */}
           <div className="flex gap-3 pt-2">
             <button
-              onClick={() => { setActiveTab('list'); setEditingId(null); setForm(emptyForm); }}
+              onClick={() => handleExitWrite()}
               className="flex-1 py-2.5 text-sm text-text-secondary hover:text-text-primary border border-border-custom rounded-lg transition-colors"
             >
               取消

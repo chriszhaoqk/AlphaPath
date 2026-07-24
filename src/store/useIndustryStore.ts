@@ -24,7 +24,7 @@ interface IndustryState {
   loading: boolean;
   error: string | null;
   fetchResearches: () => Promise<void>;
-  addResearch: (research: Omit<IndustryResearch, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  addResearch: (research: Omit<IndustryResearch, 'id' | 'created_at' | 'updated_at'>) => Promise<string>;
   updateResearch: (id: string, updates: Partial<IndustryResearch>) => Promise<void>;
   deleteResearch: (id: string) => Promise<void>;
   publishResearch: (id: string) => Promise<void>;
@@ -42,13 +42,15 @@ export const useIndustryStore = create<IndustryState>()(
 
       addResearch: async (research) => {
         const now = new Date().toISOString();
+        const id = generateId();
         const newResearch: IndustryResearch = {
           ...research,
-          id: generateId(),
+          id,
           created_at: now,
           updated_at: now,
         };
         set((state) => ({ researches: [...state.researches, newResearch] }));
+        return id;
       },
 
       updateResearch: async (id, updates) => {
