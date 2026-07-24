@@ -81,6 +81,48 @@ export default function IndustryPage() {
     investmentImplications: '投资启示',
   };
 
+  // 草稿自动保存：将当前表单内容以 draft 状态保存
+  // - 已有 editingId：更新该条记录为草稿
+  // - 新建：创建一条草稿，并把返回的 id 赋给 editingId（后续自动保存复用同一条）
+  // - 标题为空则跳过（无意义内容不保存）
+  // 注意：必须定义在下方依赖它的 useEffect 之前，否则触发 TDZ ReferenceError
+  const handleAutoSaveDraft = useCallback(async (silent = true): Promise<void> => {
+    const f = formRef.current;
+    if (!f.title || !f.title.trim()) return;
+    const payload = {
+      title: f.title.trim(),
+      industry: f.industry,
+      subIndustry: f.subIndustry || undefined,
+      date: f.date,
+      participants: f.participants || undefined,
+      summary: f.summary,
+      keyFindings: f.keyFindings,
+      investmentImplications: f.investmentImplications,
+      status: 'draft' as const,
+      tags: f.tags,
+    };
+    const curId = editingIdRef.current;
+    if (curId) {
+      await updateResearch(curId, payload);
+    } else {
+      const newId = await addResearch(payload);
+      editingIdRef.current = newId;
+      setEditingId(newId);
+    }
+    setAutoSaveHint({ at: Date.now() });
+    if (!silent) {
+      setTimeout(() => setAutoSaveHint(null), 2500);
+    }
+  }, [addResearch, updateResearch]);
+
+  // 退出写纪要视图：自动存草稿后返回列表
+  const handleExitWrite = useCallback(async () => {
+    await handleAutoSaveDraft(false);
+    setActiveTab('list');
+    setEditingId(null);
+    setForm(emptyForm);
+  }, [handleAutoSaveDraft]);
+
   useEffect(() => {
     fetchResearches();
   }, [fetchResearches]);
@@ -227,47 +269,6 @@ export default function IndustryPage() {
     await deleteResearch(id);
     if (expandedId === id) setExpandedId(null);
   };
-
-  // 草稿自动保存：将当前表单内容以 draft 状态保存
-  // - 已有 editingId：更新该条记录为草稿
-  // - 新建：创建一条草稿，并把返回的 id 赋给 editingId（后续自动保存复用同一条）
-  // - 标题为空则跳过（无意义内容不保存）
-  const handleAutoSaveDraft = useCallback(async (silent = true): Promise<void> => {
-    const f = formRef.current;
-    if (!f.title || !f.title.trim()) return; // 无标题不保存
-    const payload = {
-      title: f.title.trim(),
-      industry: f.industry,
-      subIndustry: f.subIndustry || undefined,
-      date: f.date,
-      participants: f.participants || undefined,
-      summary: f.summary,
-      keyFindings: f.keyFindings,
-      investmentImplications: f.investmentImplications,
-      status: 'draft' as const,
-      tags: f.tags,
-    };
-    const curId = editingIdRef.current;
-    if (curId) {
-      await updateResearch(curId, payload);
-    } else {
-      const newId = await addResearch(payload);
-      editingIdRef.current = newId;
-      setEditingId(newId);
-    }
-    setAutoSaveHint({ at: Date.now() });
-    if (!silent) {
-      setTimeout(() => setAutoSaveHint(null), 2500);
-    }
-  }, [addResearch, updateResearch]);
-
-  // 退出写纪要视图：自动存草稿后返回列表
-  const handleExitWrite = useCallback(async () => {
-    await handleAutoSaveDraft(false);
-    setActiveTab('list');
-    setEditingId(null);
-    setForm(emptyForm);
-  }, [handleAutoSaveDraft]);
 
   const handlePublish = async (id: string) => {
     await publishResearch(id);
