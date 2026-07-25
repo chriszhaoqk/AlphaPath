@@ -1,4 +1,3 @@
-import type { Strategy } from '@/store/useStrategyStore';
 import type { SkillScores } from '@/store/useSkillStore';
 import type { Goal, Milestone, OKR, KeyResult } from '@/store/useGoalStore';
 
@@ -289,35 +288,6 @@ export const quarterlyChecklist: ChecklistItem[] = [
   { title: '行业知识体系更新', tags: ['industry'] },
   { title: '下季度OKR制定', tags: ['strategy'] },
   { title: '年度目标进度检查', tags: ['review'] },
-];
-
-// ============ Strategy Presets ============
-
-export const strategyPresets: Omit<Strategy, 'id' | 'createdAt' | 'updatedAt'>[] = [
-  {
-    type: 'bull',
-    positionGuidance: '80-95%',
-    allocationGuidance: '成长>价值，进攻性行业集中',
-    stockSelection: '景气度最高+弹性最大',
-    signals: '成交量放大/融资余额上升/新基金爆款',
-    hedging: '估值极端+情绪过热时逐步减仓',
-  },
-  {
-    type: 'bear',
-    positionGuidance: '20-40%',
-    allocationGuidance: '高股息+低估值+防御行业',
-    stockSelection: '现金流充裕+护城河深+分红稳定',
-    signals: '破净率>10%/换手率极低/情绪冰点时逐步加仓',
-    hedging: '股指期货/期权保护',
-  },
-  {
-    type: 'range',
-    positionGuidance: '50-70%',
-    allocationGuidance: '结构性行业轮动',
-    stockSelection: '业绩确定性+估值合理',
-    signals: '跌买涨卖，控制节奏',
-    hedging: '量化因子+事件驱动',
-  },
 ];
 
 // ============ Initial Skill Scores ============

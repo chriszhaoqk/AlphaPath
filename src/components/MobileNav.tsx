@@ -2,13 +2,11 @@ import { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Target,
   Calendar,
   CheckSquare,
   BookOpen,
   PenLine,
   Radar,
-  Shield,
   Settings,
   X,
   LogOut,
@@ -28,7 +26,6 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '仪表盘' },
-  { to: '/roadmap', icon: Target, label: '目标路线图' },
 
   { to: '/tasks', icon: CheckSquare, label: '任务中心' },
   { to: '/industry', icon: Building2, label: '产业调研' },
@@ -37,7 +34,6 @@ const navItems = [
   { to: '/learning', icon: BookOpen, label: '学习追踪' },
   { to: '/journal', icon: PenLine, label: '投资笔记' },
   { to: '/skills', icon: Radar, label: '通关测试' },
-  { to: '/strategy', icon: Shield, label: '策略框架' },
   { to: '/settings', icon: Settings, label: '设置' },
 ];
 

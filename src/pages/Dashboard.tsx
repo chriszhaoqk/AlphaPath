@@ -7,11 +7,9 @@ import {
   CheckCircle2,
   FileText,
   Cloud,
-  Target,
   Calendar,
   Building2,
   Radar,
-  Shield,
   TrendingUp,
   ChevronRight,
   Sparkles,
@@ -64,14 +62,12 @@ interface ModuleCard {
 }
 
 const moduleCards: ModuleCard[] = [
-  { to: '/roadmap', icon: Target, title: '目标路线图', subtitle: '10年职业规划', tint: 'border-gold/20', iconBg: 'bg-gold/15', iconColor: 'text-gold' },
   { to: '/schedule', icon: Calendar, title: '日程管理', subtitle: '每日安排', tint: 'border-blue-400/20', iconBg: 'bg-blue-500/15', iconColor: 'text-blue-400' },
   { to: '/tasks', icon: CheckCircle2, title: '任务中心', subtitle: '四象限管理', tint: 'border-urgent/20', iconBg: 'bg-urgent/15', iconColor: 'text-urgent' },
   { to: '/industry', icon: Building2, title: '产业调研', subtitle: '纪要管理', tint: 'border-emerald-400/20', iconBg: 'bg-emerald-500/15', iconColor: 'text-emerald-400' },
   { to: '/learning', icon: BookOpen, title: '学习追踪', subtitle: '知识积累', tint: 'border-purple-400/20', iconBg: 'bg-purple-500/15', iconColor: 'text-purple-400' },
   { to: '/journal', icon: PenLine, title: '投资笔记', subtitle: '思考记录', tint: 'border-amber-400/20', iconBg: 'bg-amber-500/15', iconColor: 'text-amber-400' },
   { to: '/skills', icon: Radar, title: '投资通关测试', subtitle: '季度考核', tint: 'border-cyan-400/20', iconBg: 'bg-cyan-500/15', iconColor: 'text-cyan-400' },
-  { to: '/strategy', icon: Shield, title: '策略框架', subtitle: '投资体系', tint: 'border-teal-400/20', iconBg: 'bg-teal-500/15', iconColor: 'text-teal-400' },
 ];
 
 export default function Dashboard() {

@@ -7,11 +7,9 @@ import Register from '@/pages/Register';
 import LearningPage from '@/pages/Learning';
 import JournalPage from '@/pages/Journal';
 import Skills from '@/pages/Skills';
-import Strategy from '@/pages/Strategy';
 import Settings from '@/pages/Settings';
 import Tasks from '@/pages/Tasks';
 import Dashboard from '@/pages/Dashboard';
-import Roadmap from '@/pages/Roadmap';
 import IndustryPage from '@/pages/Industry';
 import FundsPage from '@/pages/Funds';
 import DiaryPage from '@/pages/Diary';
@@ -59,7 +57,6 @@ export default function App() {
           }
         >
           <Route path="/" element={<Dashboard />} />
-          <Route path="/roadmap" element={<Roadmap />} />
 
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/industry" element={<IndustryPage />} />
@@ -68,7 +65,6 @@ export default function App() {
           <Route path="/learning" element={<LearningPage />} />
           <Route path="/journal" element={<JournalPage />} />
           <Route path="/skills" element={<Skills />} />
-          <Route path="/strategy" element={<Strategy />} />
           <Route path="/settings" element={<Settings />} />
         </Route>
 

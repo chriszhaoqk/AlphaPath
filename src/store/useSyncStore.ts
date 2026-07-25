@@ -6,7 +6,6 @@ import { useIndustryStore } from './useIndustryStore';
 import { useJournalStore } from './useJournalStore';
 import { useLearningStore } from './useLearningStore';
 import { useSkillStore } from './useSkillStore';
-import { useStrategyStore } from './useStrategyStore';
 
 interface SyncPayload {
   version: string;
@@ -17,7 +16,6 @@ interface SyncPayload {
   journals: unknown[];
   learnings: unknown[];
   assessments: unknown[];
-  strategies: unknown[];
 }
 
 interface SyncState {
@@ -52,7 +50,6 @@ function collectLocalData(): SyncPayload {
   const journalState = useJournalStore.getState();
   const learningState = useLearningStore.getState();
   const skillState = useSkillStore.getState();
-  const strategyState = useStrategyStore.getState();
 
   return {
     version: DATA_VERSION,
@@ -63,7 +60,6 @@ function collectLocalData(): SyncPayload {
     journals: [...journalState.journals],
     learnings: [...learningState.learnings],
     assessments: [...skillState.assessments],
-    strategies: [...strategyState.strategies],
   };
 }
 
@@ -102,15 +98,6 @@ function applyRemoteData(remote: SyncPayload) {
   const mergedJournals = mergeByUpdatedAt(local.journals as any[], remote.journals as any[]);
   const mergedLearnings = mergeByUpdatedAt(local.learnings as any[], remote.learnings as any[]);
   const mergedAssessments = mergeByUpdatedAt(local.assessments as any[], remote.assessments as any[]);
-  const mergedStrategies = mergeByUpdatedAt(local.strategies as any[], remote.strategies as any[]);
-
-  const { set: _taskSet, ..._taskRest } = useTaskStore.getState();
-  const { set: _goalSet, ..._goalRest } = useGoalStore.getState();
-  const { set: _industrySet, ..._industryRest } = useIndustryStore.getState();
-  const { set: _journalSet, ..._journalRest } = useJournalStore.getState();
-  const { set: _learningSet, ..._learningRest } = useLearningStore.getState();
-  const { set: _skillSet, ..._skillRest } = useSkillStore.getState();
-  const { set: _strategySet, ..._strategyRest } = useStrategyStore.getState();
 
   useTaskStore.setState({ tasks: mergedTasks as any });
   useGoalStore.setState({ goals: mergedGoals as any });
@@ -118,7 +105,6 @@ function applyRemoteData(remote: SyncPayload) {
   useJournalStore.setState({ journals: mergedJournals as any });
   useLearningStore.setState({ learnings: mergedLearnings as any });
   useSkillStore.setState({ assessments: mergedAssessments as any });
-  useStrategyStore.setState({ strategies: mergedStrategies as any });
 }
 
 export const useSyncStore = create<SyncState>()(
