@@ -16,8 +16,8 @@ export const AI_PROVIDERS: AIProviderPreset[] = [
     id: 'deepseek',
     label: 'DeepSeek',
     baseURL: 'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
-    modelOptions: ['deepseek-chat', 'deepseek-reasoner'],
+    defaultModel: 'deepseek-v4-flash',
+    modelOptions: ['deepseek-v4-flash', 'deepseek-v4-pro', 'deepseek-chat', 'deepseek-reasoner'],
     apiKeyUrl: 'https://platform.deepseek.com/api_keys',
   },
   {

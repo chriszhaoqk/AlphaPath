@@ -462,19 +462,26 @@ export default function Settings() {
 
           {/* 模型选择/输入 */}
           <div>
-            <label className="block text-xs text-text-secondary mb-2">模型</label>
-            {aiStore.providerId !== 'custom' && AI_PROVIDERS.find((p) => p.id === aiStore.providerId)?.modelOptions.length ? (
-              <select
-                value={aiStore.model}
-                onChange={(e) => { aiStore.setModel(e.target.value); setAiCustomModel(e.target.value); setAiTestStatus('idle'); }}
-                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50"
-              >
-                {(AI_PROVIDERS.find((p) => p.id === aiStore.providerId)?.modelOptions || []).map((m) => (
-                  <option key={m} value={m}>{m}</option>
-                ))}
-              </select>
-            ) : (
-              <div className="flex gap-2">
+            <label className="block text-xs text-text-secondary mb-2">
+              模型
+              <span className="text-text-muted ml-1">（可直接编辑模型名）</span>
+            </label>
+            <div className="flex gap-2">
+              {aiStore.providerId !== 'custom' && (AI_PROVIDERS.find((p) => p.id === aiStore.providerId)?.modelOptions.length ?? 0) > 0 ? (
+                <select
+                  value={aiCustomModel}
+                  onChange={(e) => { setAiCustomModel(e.target.value); aiStore.setModel(e.target.value); setAiTestStatus('idle'); setAiTestMessage(''); }}
+                  className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                >
+                  {/* 合并预设选项与当前已保存模型名（防止预设过时导致当前值丢失） */}
+                  {Array.from(new Set([
+                    ...(AI_PROVIDERS.find((p) => p.id === aiStore.providerId)?.modelOptions || []),
+                    aiStore.model,
+                  ])).map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
                 <input
                   type="text"
                   value={aiCustomModel}
@@ -482,15 +489,35 @@ export default function Settings() {
                   placeholder="model-name"
                   className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50"
                 />
-                <button
-                  onClick={handleSaveCustomModel}
-                  disabled={!aiCustomModel.trim() || aiCustomModel.trim() === aiStore.model}
-                  className="px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E] disabled:opacity-40"
-                >
-                  保存
-                </button>
-              </div>
-            )}
+              )}
+              <button
+                onClick={() => {
+                  if (aiCustomModel.trim() && aiCustomModel.trim() !== aiStore.model) {
+                    aiStore.setModel(aiCustomModel.trim());
+                    setAiTestStatus('idle');
+                    setAiTestMessage('');
+                  }
+                }}
+                disabled={!aiCustomModel.trim() || aiCustomModel.trim() === aiStore.model}
+                className="px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E] disabled:opacity-40"
+                title="手动输入自定义模型名后点击保存"
+              >
+                保存
+              </button>
+            </div>
+            <input
+              type="text"
+              value={aiCustomModel}
+              onChange={(e) => setAiCustomModel(e.target.value)}
+              placeholder="或在此手动输入任意模型名（如 deepseek-v4-pro）"
+              className="mt-2 w-full bg-ink border border-border-custom rounded-lg px-3 py-2 text-xs text-text-primary focus:outline-none focus:border-gold/50"
+            />
+            <p className="mt-1 text-xs text-text-muted">
+              当前使用：<span className="text-gold">{aiStore.model}</span>
+              {aiCustomModel.trim() && aiCustomModel.trim() !== aiStore.model && (
+                <span className="text-amber-400 ml-2">（输入框有未保存的改动）</span>
+              )}
+            </p>
           </div>
 
           {/* API Key */}
