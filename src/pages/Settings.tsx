@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useSyncStore } from '@/store/useSyncStore';
+import { useAIStore, AI_PROVIDERS } from '@/store/useAIStore';
+import { testAIConnection } from '@/lib/ai';
 import {
   Cloud,
   CloudOff,
@@ -16,6 +18,11 @@ import {
   AlertCircle,
   FileJson,
   Trash2,
+  Sparkles,
+  Eye,
+  EyeOff,
+  Loader2,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function Settings() {
@@ -34,6 +41,51 @@ export default function Settings() {
   const [updateVersion, setUpdateVersion] = useState('');
   const [updateProgress, setUpdateProgress] = useState(0);
   const [updateError, setUpdateError] = useState('');
+
+  // AI 助手配置
+  const aiStore = useAIStore();
+  const [aiKeyInput, setAiKeyInput] = useState('');
+  const [showAiKey, setShowAiKey] = useState(false);
+  const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
+  const [aiTestMessage, setAiTestMessage] = useState('');
+  const [aiCustomModel, setAiCustomModel] = useState(aiStore.model);
+
+  const handleSaveAiKey = () => {
+    if (aiKeyInput.trim()) {
+      aiStore.setApiKey(aiKeyInput.trim());
+      setAiKeyInput('');
+      setAiTestStatus('idle');
+      setAiTestMessage('');
+    }
+  };
+
+  const handleTestAi = async () => {
+    setAiTestStatus('testing');
+    setAiTestMessage('');
+    try {
+      const reply = await testAIConnection();
+      setAiTestStatus('success');
+      setAiTestMessage(`连接成功：${reply.slice(0, 60)}`);
+    } catch (err: any) {
+      setAiTestStatus('error');
+      setAiTestMessage(err?.message || '连接失败');
+    }
+  };
+
+  const handleProviderChange = (id: string) => {
+    aiStore.setProvider(id);
+    const preset = AI_PROVIDERS.find((p) => p.id === id);
+    if (preset) setAiCustomModel(preset.defaultModel);
+    setAiTestStatus('idle');
+    setAiTestMessage('');
+  };
+
+  const handleSaveCustomModel = () => {
+    if (aiCustomModel.trim()) {
+      aiStore.setModel(aiCustomModel.trim());
+      setAiTestStatus('idle');
+    }
+  };
 
   const {
     githubToken,
@@ -366,6 +418,176 @@ export default function Settings() {
               className="hidden"
               onChange={handleFileImport}
             />
+          </div>
+        </div>
+      </section>
+
+      {/* AI Assistant Configuration */}
+      <section>
+        <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+          <Sparkles size={16} className="text-gold" />
+          AI 助手配置
+        </h2>
+        <div className="card p-4 md:p-5 space-y-4">
+          <p className="text-xs text-text-muted">
+            配置 AI 助手后，「任务中心 → 每日总结」将以资深基金经理视角深度分析当日工作，给出立即可做的改进建议与中长期成长规划。所有配置仅存储在本地。
+          </p>
+
+          {/* 服务商选择 */}
+          <div>
+            <label className="block text-xs text-text-secondary mb-2">服务商</label>
+            <select
+              value={aiStore.providerId}
+              onChange={(e) => handleProviderChange(e.target.value)}
+              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+            >
+              {AI_PROVIDERS.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Base URL（自定义可编辑） */}
+          <div>
+            <label className="block text-xs text-text-secondary mb-2">Base URL</label>
+            <input
+              type="text"
+              value={aiStore.baseURL}
+              onChange={(e) => aiStore.setBaseURL(e.target.value)}
+              placeholder="https://api.example.com/v1"
+              disabled={aiStore.providerId !== 'custom'}
+              className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50 disabled:opacity-60"
+            />
+          </div>
+
+          {/* 模型选择/输入 */}
+          <div>
+            <label className="block text-xs text-text-secondary mb-2">模型</label>
+            {aiStore.providerId !== 'custom' && AI_PROVIDERS.find((p) => p.id === aiStore.providerId)?.modelOptions.length ? (
+              <select
+                value={aiStore.model}
+                onChange={(e) => { aiStore.setModel(e.target.value); setAiCustomModel(e.target.value); setAiTestStatus('idle'); }}
+                className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+              >
+                {(AI_PROVIDERS.find((p) => p.id === aiStore.providerId)?.modelOptions || []).map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={aiCustomModel}
+                  onChange={(e) => setAiCustomModel(e.target.value)}
+                  placeholder="model-name"
+                  className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                />
+                <button
+                  onClick={handleSaveCustomModel}
+                  disabled={!aiCustomModel.trim() || aiCustomModel.trim() === aiStore.model}
+                  className="px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E] disabled:opacity-40"
+                >
+                  保存
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* API Key */}
+          <div>
+            <label className="block text-xs text-text-secondary mb-2">API Key</label>
+            {aiStore.apiKey ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-muted overflow-hidden">
+                    {showAiKey ? aiStore.apiKey : '••••••••••••' + aiStore.apiKey.slice(-8)}
+                  </div>
+                  <button
+                    onClick={() => setShowAiKey(!showAiKey)}
+                    className="flex items-center gap-1 px-3 py-2 text-xs border border-border-custom rounded-lg text-text-secondary active:bg-[#1A1F2E]"
+                  >
+                    {showAiKey ? <EyeOff size={12} /> : <Eye size={12} />}
+                  </button>
+                  <button
+                    onClick={() => { aiStore.setApiKey(''); setAiTestStatus('idle'); setAiTestMessage(''); }}
+                    className="px-3 py-2 text-xs border border-urgent/30 rounded-lg text-urgent active:bg-urgent/10"
+                  >
+                    清除
+                  </button>
+                </div>
+                <p className="text-xs text-positive flex items-center gap-1">
+                  <Check size={12} /> API Key 已保存
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  value={aiKeyInput}
+                  onChange={(e) => setAiKeyInput(e.target.value)}
+                  placeholder="sk-..."
+                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                />
+                <button
+                  onClick={handleSaveAiKey}
+                  disabled={!aiKeyInput.trim()}
+                  className="px-3 py-2 text-xs btn-gold disabled:opacity-40"
+                >
+                  保存 API Key
+                </button>
+              </div>
+            )}
+            {aiStore.providerId !== 'custom' && AI_PROVIDERS.find((p) => p.id === aiStore.providerId)?.apiKeyUrl && (
+              <a
+                href={AI_PROVIDERS.find((p) => p.id === aiStore.providerId)!.apiKeyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 mt-2 text-xs text-gold hover:underline"
+              >
+                <ExternalLink size={11} /> 获取 API Key
+              </a>
+            )}
+          </div>
+
+          {/* 测试连接 */}
+          {aiStore.isConfigured() && (
+            <div className="pt-3 border-t border-border-custom">
+              <button
+                onClick={handleTestAi}
+                disabled={aiTestStatus === 'testing'}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs border border-gold/30 rounded-lg text-gold hover:bg-gold/10 transition-colors disabled:opacity-40"
+              >
+                {aiTestStatus === 'testing' ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                测试连接
+              </button>
+              {aiTestStatus === 'success' && (
+                <p className="mt-2 text-xs text-positive flex items-start gap-1.5">
+                  <Check size={12} className="flex-shrink-0 mt-0.5" />
+                  <span className="break-all">{aiTestMessage}</span>
+                </p>
+              )}
+              {aiTestStatus === 'error' && (
+                <p className="mt-2 text-xs text-urgent flex items-start gap-1.5">
+                  <AlertCircle size={12} className="flex-shrink-0 mt-0.5" />
+                  <span className="break-all">{aiTestMessage}</span>
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* 当前状态 */}
+          <div className="pt-3 border-t border-border-custom text-xs">
+            <p className="text-text-muted">
+              状态：
+              {aiStore.isConfigured() ? (
+                <span className="text-positive">已就绪（{aiStore.providerId} / {aiStore.model}）</span>
+              ) : (
+                <span className="text-text-muted">未配置完整</span>
+              )}
+            </p>
+            <p className="text-text-muted mt-1">
+              配置完成后，前往「任务中心」点击「AI 生成总结」体验深度分析。
+            </p>
           </div>
         </div>
       </section>

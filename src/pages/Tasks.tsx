@@ -21,13 +21,17 @@ import {
   BookOpen,
   PenLine,
   BarChart3,
+  AlertTriangle,
 } from 'lucide-react';
 import { useTaskStore, type Quadrant, type TagType, type Task, type TaskScope } from '@/store/useTaskStore';
 import { useIndustryStore } from '@/store/useIndustryStore';
 import { useLearningStore } from '@/store/useLearningStore';
 import { useJournalStore } from '@/store/useJournalStore';
+import { useAIStore } from '@/store/useAIStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
 import VoiceTextInput from '@/components/VoiceTextInput';
+import { chatCompletion } from '@/lib/ai';
+import { buildDailySummaryMessages, type DailyTaskStats } from '@/lib/aiPrompts';
 
 const QUADRANT_CONFIG: Record<Quadrant, { label: string; color: string; desc: string }> = {
   A: { label: 'A', color: 'bg-urgent', desc: '重要紧急' },
@@ -185,6 +189,9 @@ export default function Tasks() {
 
   // AI summary
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiUsedFallback, setAiUsedFallback] = useState(false);
+  const aiConfigured = useAIStore((s) => s.isConfigured());
 
   // Manual time input
   const [timeInputTaskId, setTimeInputTaskId] = useState<string | null>(null);
@@ -572,10 +579,8 @@ export default function Tasks() {
     setEditorOpen(true);
   };
 
-  // AI generate summary
-  const generateAISummary = () => {
-    setAiGenerating(true);
-
+  // 构造模板总结（AI 未配置或调用失败时的回退）
+  const buildTemplateSummary = useCallback((): string => {
     const completedTasks = dayTasks.filter((t) => t.completed);
     const uncompletedTasks = dayTasks.filter((t) => !t.completed);
 
@@ -612,8 +617,7 @@ export default function Tasks() {
       .filter((t) => getLiveTimeSpent(t) > 0)
       .sort((a, b) => getLiveTimeSpent(b) - getLiveTimeSpent(a));
 
-    setTimeout(() => {
-      const summary = `
+    return `
 <h3 style="color:#D4A853; margin-bottom:0.5em;">📋 ${dateCN} 工作总结</h3>
 
 <p style="text-indent:2em; margin-bottom:0.5em;">
@@ -684,10 +688,72 @@ ${
         : `<p style="margin-top:1em; text-indent:2em; color:#9CA3AF;">今日暂无任务记录，建议提前规划明日工作。</p>`
 }
 `.trim();
+  }, [dayTasks, selectedDate, totalCount, completedCount, totalTimeSpent]);
 
-      saveDailySummary(selectedDate, summary);
+  // 构造发送给 AI 的统计数据
+  const buildStats = useCallback((): DailyTaskStats => {
+    const quadrantStats: DailyTaskStats['quadrantStats'] = { A: { total: 0, done: 0, timeSec: 0 }, B: { total: 0, done: 0, timeSec: 0 }, C: { total: 0, done: 0, timeSec: 0 }, D: { total: 0, done: 0, timeSec: 0 } };
+    const tagStats: DailyTaskStats['tagStats'] = {};
+    dayTasks.forEach((t) => {
+      const time = getLiveTimeSpent(t);
+      quadrantStats[t.quadrant].total++;
+      quadrantStats[t.quadrant].timeSec += time;
+      if (t.completed) quadrantStats[t.quadrant].done++;
+      t.tags.forEach((tag) => {
+        if (!tagStats[tag]) tagStats[tag] = { total: 0, done: 0, timeSec: 0 };
+        tagStats[tag].total++;
+        tagStats[tag].timeSec += time;
+        if (t.completed) tagStats[tag].done++;
+      });
+    });
+    return {
+      date: selectedDate,
+      totalCount,
+      completedCount,
+      completionRate: totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0,
+      totalTimeSpentSec: totalTimeSpent,
+      quadrantStats,
+      tagStats,
+      completedTasks: dayTasks.filter((t) => t.completed).map((t) => ({ title: t.title, tags: t.tags, timeSec: getLiveTimeSpent(t) })),
+      uncompletedTasks: dayTasks.filter((t) => !t.completed).map((t) => ({ title: t.title, quadrant: t.quadrant })),
+    };
+  }, [dayTasks, selectedDate, totalCount, completedCount, totalTimeSpent]);
+
+  // AI 生成每日总结（深度建议版）
+  const generateAISummary = async () => {
+    setAiGenerating(true);
+    setAiError(null);
+    setAiUsedFallback(false);
+
+    // 未配置 AI：回退到模板
+    if (!aiConfigured) {
+      setTimeout(() => {
+        const summary = buildTemplateSummary();
+        saveDailySummary(selectedDate, summary);
+        setAiUsedFallback(true);
+        setAiError('未配置 AI 助手，已生成基础统计总结。前往「设置 → AI 助手」配置后可获取深度建议。');
+        setAiGenerating(false);
+      }, 800);
+      return;
+    }
+
+    // 调用真实 AI
+    try {
+      const stats = buildStats();
+      const messages = buildDailySummaryMessages(stats);
+      const html = await chatCompletion({ messages, temperature: 0.7, maxTokens: 2200 });
+      // 简单清洗：若 AI 返回 markdown 代码块包裹则剥离
+      const cleaned = html.replace(/^```html\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+      saveDailySummary(selectedDate, cleaned);
       setAiGenerating(false);
-    }, 1500);
+    } catch (err: any) {
+      // 失败时回退到模板，并提示错误
+      const summary = buildTemplateSummary();
+      saveDailySummary(selectedDate, summary);
+      setAiUsedFallback(true);
+      setAiError(`AI 调用失败：${err?.message || '未知错误'}。已生成基础统计总结作为回退。`);
+      setAiGenerating(false);
+    }
   };
 
   // Toggle tag in add form
@@ -1144,6 +1210,14 @@ ${
           <h2 className="text-base font-semibold text-text-primary flex items-center gap-2">
             <Sparkles size={16} className="text-gold" />
             每日总结
+            {aiConfigured ? (
+              <span className="text-xs text-positive flex items-center gap-1 ml-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-positive" />
+                AI 已就绪
+              </span>
+            ) : (
+              <span className="text-xs text-text-muted ml-1">（未配置 AI，将生成基础统计）</span>
+            )}
           </h2>
           <button
             onClick={generateAISummary}
@@ -1158,16 +1232,28 @@ ${
         {aiGenerating ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 size={24} className="animate-spin text-gold" />
-            <span className="ml-3 text-sm text-text-muted">AI 正在分析今日工作...</span>
+            <span className="ml-3 text-sm text-text-muted">
+              {aiConfigured ? 'AI 正在以基金经理视角深度分析今日工作...' : '正在生成基础统计总结...'}
+            </span>
           </div>
-        ) : dailySummary ? (
-          <div className="prose-sm" dangerouslySetInnerHTML={{ __html: dailySummary.summary }} />
         ) : (
-          <div className="py-6 text-center text-text-muted text-sm">
-            {totalCount === 0
-              ? '添加任务后即可生成每日总结'
-              : '点击「AI 生成总结」分析今日工作情况'}
-          </div>
+          <>
+            {(aiError || aiUsedFallback) && (
+              <div className={`mb-3 px-3 py-2 rounded-lg text-xs flex items-start gap-2 ${aiError ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' : 'bg-text-muted/10 text-text-muted'}`}>
+                <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                <span>{aiError}</span>
+              </div>
+            )}
+            {dailySummary ? (
+              <div className="prose-sm" dangerouslySetInnerHTML={{ __html: dailySummary.summary }} />
+            ) : (
+              <div className="py-6 text-center text-text-muted text-sm">
+                {totalCount === 0
+                  ? '添加任务后即可生成每日总结'
+                  : '点击「AI 生成总结」分析今日工作情况'}
+              </div>
+            )}
+          </>
         )}
       </div>
       )}
