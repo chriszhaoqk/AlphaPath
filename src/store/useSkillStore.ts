@@ -8,10 +8,26 @@ export interface SkillScores {
   macro: number;       // 宏观考核
 }
 
+// 单题作答与AI点评
+export interface QuestionAnswer {
+  questionId: string;
+  dimension: keyof SkillScores;
+  category: string;
+  title: string;
+  scenario: string;
+  prompt: string;
+  source: string;
+  answer: string;           // 用户作答文本
+  score: number;            // 0-10 分
+  feedback: string;         // AI 点评（HTML）
+  improvements: string;     // AI 修改建议（HTML）
+}
+
 export interface Assessment {
   id: string;
   scores: SkillScores;
-  notes?: string;
+  notes?: string;           // 总体评语（HTML）
+  answers?: QuestionAnswer[]; // 各题作答与点评（新版主观题）
   quarter: string;      // e.g. "2026-Q3"
   assessedAt: string;
   createdAt: string;
@@ -66,10 +82,10 @@ export const useSkillStore = create<SkillState>()(
     }),
     {
       name: 'alphapath-skills',
-      version: 2,
+      version: 3,
       migrate: (persisted: any, version: number) => {
-        if (version < 2) {
-          // v2: 迁移到4维模型，清空旧数据
+        if (version < 3) {
+          // v3: 改为主观面试题，旧选择题历史数据结构不兼容，清空
           return { ...persisted, assessments: [] };
         }
         return persisted;

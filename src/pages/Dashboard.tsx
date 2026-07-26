@@ -67,7 +67,7 @@ const moduleCards: ModuleCard[] = [
   { to: '/industry', icon: Building2, title: '产业调研', subtitle: '纪要管理', tint: 'border-emerald-400/20', iconBg: 'bg-emerald-500/15', iconColor: 'text-emerald-400' },
   { to: '/learning', icon: BookOpen, title: '学习追踪', subtitle: '知识积累', tint: 'border-purple-400/20', iconBg: 'bg-purple-500/15', iconColor: 'text-purple-400' },
   { to: '/journal', icon: PenLine, title: '投资笔记', subtitle: '思考记录', tint: 'border-amber-400/20', iconBg: 'bg-amber-500/15', iconColor: 'text-amber-400' },
-  { to: '/skills', icon: Radar, title: '投资通关测试', subtitle: '季度考核', tint: 'border-cyan-400/20', iconBg: 'bg-cyan-500/15', iconColor: 'text-cyan-400' },
+  { to: '/skills', icon: Radar, title: '头部基金面试题', subtitle: '季度面试', tint: 'border-cyan-400/20', iconBg: 'bg-cyan-500/15', iconColor: 'text-cyan-400' },
 ];
 
 export default function Dashboard() {
@@ -289,14 +289,14 @@ export default function Dashboard() {
       <div className="card p-4">
         <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
           <Radar size={16} className="text-cyan-400" />
-          投资通关测试
+          头部基金面试题
         </h2>
         <div className="flex justify-center">
           {latestScores ? (
             <RadarChart scores={latestScores} maxScore={10} size={220} />
           ) : (
             <div className="flex items-center justify-center h-48 text-text-muted text-sm">
-              暂无测试数据，前往投资通关测试开始季度测试
+              暂无测试数据，前往头部基金面试题开始季度测试
             </div>
           )}
         </div>

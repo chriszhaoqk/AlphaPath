@@ -25,7 +25,7 @@ const navItems = [
   { to: '/diary', icon: BookHeart, label: '个人日记' },
   { to: '/learning', icon: BookOpen, label: '学习追踪' },
   { to: '/journal', icon: PenLine, label: '投资笔记' },
-  { to: '/skills', icon: Radar, label: '投资通关测试' },
+  { to: '/skills', icon: Radar, label: '头部基金面试题' },
   { to: '/settings', icon: Settings, label: '设置' },
 ];
 

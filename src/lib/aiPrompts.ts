@@ -106,3 +106,126 @@ function formatSec(sec: number): string {
   if (h > 0) return `${h}时${m}分`;
   return `${m}分`;
 }
+
+// ============ 主观面试题评分 ============
+
+export interface InterviewAnswerInput {
+  questionId: string;
+  dimension: string;
+  category: string;
+  title: string;
+  scenario: string;
+  prompt: string;
+  source: string;
+  referenceKeywords: string[];
+  answer: string;
+}
+
+export interface InterviewScoreResult {
+  score: number;          // 0-10
+  feedback: string;       // HTML 点评
+  improvements: string;   // HTML 修改建议
+}
+
+// 单题评分的 system prompt
+const SYSTEM_PROMPT_INTERVIEWER = `你是一位参与过睿远、淡水泉、高毅、景林等头部主观基金投研面试的资深合伙人，正在评估候选人（一名立志成为基金经理的券商分析师）的作答。
+
+评分标尺（0-10 分）：
+- 9-10 分（S 级）：见解超越从业年限，有独立深度思考，能识别题目陷阱，论证严密，可直接用于投资决策。
+- 7-8 分（A 级）：框架完整、逻辑清晰，覆盖核心维度，有可落地的结论，达到头部基金研究员水平。
+- 5-6 分（B 级）：方向正确但深度不足，或遗漏关键维度，停留在"知道"而非"理解"层面。
+- 3-4 分（C 级）：套话堆砌、逻辑混乱、缺乏数据支撑，未达到研究员合格水平。
+- 0-2 分（D 级）：答非所问或过于简陋，未展现专业认知。
+
+点评原则：
+1. 像真实面试官一样诚实尖锐，直接指出漏洞，不堆砌客套话。
+2. 引用候选人答案中的具体表述作为论据（如"你说'技术壁垒高'但未论证为何海外龙头无法快速跟进"）。
+3. 修改建议要给出"参考答案思路"的关键维度，但不要代写完整答案。
+4. 全部用 HTML 格式（<h4>/<p>/<ul>/<li>/<strong>），不要 markdown。`;
+
+/**
+ * 构造单题评分的 messages
+ */
+export function buildInterviewScoringMessages(input: InterviewAnswerInput): ChatMessage[] {
+  const userPrompt = `【题目来源】${input.source}
+【考察维度】${input.dimension} / ${input.category}
+【题目标题】${input.title}
+
+【题干背景】
+${input.scenario}
+
+【问题】
+${input.prompt}
+
+【参考关键词】（用于判断答案是否覆盖关键概念，但不要求全部出现）
+${input.referenceKeywords.join('、')}
+
+【候选人作答】
+"""
+${input.answer || '（未作答）'}
+"""
+
+请按以下 JSON 格式返回评分结果（务必返回合法 JSON，不要包裹 markdown 代码块，不要添加任何说明文字）：
+
+{
+  "score": <0-10 的整数>,
+  "feedback": "<HTML 格式的点评，200-400 字，先肯定亮点再指出问题>",
+  "improvements": "<HTML 格式的修改建议，200-400 字，给出参考思路的关键维度与具体可补强的方向>"
+}
+
+注意：feedback 与 improvements 必须是 HTML 字符串（可用 <p>/<ul>/<li>/<strong>），不要使用 markdown。`;
+
+  return [
+    { role: 'system', content: SYSTEM_PROMPT_INTERVIEWER },
+    { role: 'user', content: userPrompt },
+  ];
+}
+
+// 总体评语的 system prompt
+const SYSTEM_PROMPT_OVERALL = `你是一位头部主观基金的投研负责人，正在对一位应聘研究员/基金经理的候选人做整体评估。
+基于候选人在各维度主观题的得分与点评，给出一份整体评语。
+
+要求：
+1. HTML 格式输出（<h3>/<h4>/<p>/<ul>/<li>/<strong>），不要 markdown。
+2. 控制在 400-600 字。
+3. 包含：①整体水平定位 ②核心优势 ③主要短板 ④录用建议（推荐/待定/不推荐，并说明适合的岗位层级）。
+4. 诚实尖锐，有数据有论据。`;
+
+/**
+ * 构造总体评语的 messages
+ */
+export function buildOverallAssessmentMessages(
+  scoredAnswers: { dimension: string; title: string; score: number; feedback: string }[]
+): ChatMessage[] {
+  const lines: string[] = [];
+  lines.push('【候选人各题得分与点评摘要】\n');
+  scoredAnswers.forEach((a, i) => {
+    lines.push(`题目 ${i + 1}：${a.title}`);
+    lines.push(`维度：${a.dimension} | 得分：${a.score}/10`);
+    // feedback 是 HTML，简单剥离标签取纯文本摘要
+    const text = a.feedback.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    lines.push(`点评摘要：${text.slice(0, 200)}${text.length > 200 ? '...' : ''}\n`);
+  });
+
+  const userPrompt = `${lines.join('\n')}
+
+请输出 HTML 格式的整体评语，包含以下版块（用 <h3> 分隔）：
+
+1. <h3>整体水平定位</h3>
+   一段话定位候选人的当前水平（如"达到头部基金高级研究员水平，距离基金经理尚有1-2年差距"）。
+
+2. <h3>核心优势</h3>
+   2-3 条，引用具体题目表现。
+
+3. <h3>主要短板</h3>
+   2-3 条，直接指出问题。
+
+4. <h3>录用建议</h3>
+   明确给出：推荐 / 待定 / 不推荐，以及适合的岗位层级（如"研究员助理/中级研究员/高级研究员/基金经理"）。`;
+
+  return [
+    { role: 'system', content: SYSTEM_PROMPT_OVERALL },
+    { role: 'user', content: userPrompt },
+  ];
+}
+
