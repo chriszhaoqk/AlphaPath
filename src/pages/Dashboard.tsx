@@ -16,6 +16,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { useTaskStore, type Task, type Quadrant } from '@/store/useTaskStore';
+import DailyQuestionCard from '@/components/DailyQuestionCard';
 
 // 获取本地时区的日期字符串 YYYY-MM-DD（避免 toISOString 的 UTC 偏移问题）
 function getLocalDateString(date: Date): string {
@@ -212,6 +213,9 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* 每日思考题（AI 基于用户资料出题，每日必答） */}
+      <DailyQuestionCard />
 
       {/* Quick Actions */}
       <div className="card p-4">
