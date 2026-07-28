@@ -101,20 +101,29 @@ export default function Dashboard() {
     return tasks.filter((t) => t.dueDate === today);
   }, [tasks]);
 
+  // 今日 dueDate 中已完成的任务（与"今日待办"同口径，用于顶部卡片）
+  const todayCompletedTasks = useMemo(() => todayTasks.filter((t) => t.completed), [todayTasks]);
+  const todayUncompleted = useMemo(() => todayTasks.filter((t) => !t.completed), [todayTasks]);
+
+  // 今天 completedAt 的所有任务（不限 dueDate，用于"最近动态"展示今日完成的所有事）
   const completedToday = useMemo(() => {
     const today = getLocalDateString(new Date());
     return tasks.filter((t) => {
-      if (!t.completed || !t.completedAt) return false;
-      // completedAt 是 ISO 字符串，需要转换为本地日期比较
-      return getLocalDateString(new Date(t.completedAt)) === today;
+      if (!t.completed) return false;
+      // completedAt 优先，缺失时 fallback 到 updatedAt（兼容旧数据）
+      const ts = t.completedAt || t.updatedAt;
+      return getLocalDateString(new Date(ts)) === today;
     });
   }, [tasks]);
-  const todayUncompleted = useMemo(() => todayTasks.filter((t) => !t.completed), [todayTasks]);
 
   const streak = useMemo(() => {
     const completedDates = tasks
-      .filter((t) => t.completed && t.completedAt)
-      .map((t) => getLocalDateString(new Date(t.completedAt!)));
+      .filter((t) => t.completed)
+      .map((t) => {
+        // completedAt 优先，缺失时 fallback 到 updatedAt（兼容旧数据，避免打卡天数丢失）
+        const ts = t.completedAt || t.updatedAt;
+        return getLocalDateString(new Date(ts));
+      });
     const uniqueDates = [...new Set(completedDates)];
     return getStreakCount(uniqueDates);
   }, [tasks]);
@@ -206,9 +215,9 @@ export default function Dashboard() {
         </div>
         <div className="card p-4">
           <p className="text-xs text-text-muted mb-1">今日完成</p>
-          <p className="text-2xl font-bold text-positive">{completedToday.length}</p>
+          <p className="text-2xl font-bold text-positive">{todayCompletedTasks.length}</p>
           <p className="text-xs text-text-muted mt-1">
-            {todayTasks.length > 0 ? `${Math.round((completedToday.length / todayTasks.length) * 100)}%` : '—'}
+            {todayTasks.length > 0 ? `${Math.round((todayCompletedTasks.length / todayTasks.length) * 100)}%` : '—'}
           </p>
         </div>
         <div className="card p-4">

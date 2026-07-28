@@ -4,6 +4,15 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 隐藏滚动条（用于横向题号导航等） */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 /* Rich text editor styles */
 .prose-sm p {
   margin-bottom: 0.5em;

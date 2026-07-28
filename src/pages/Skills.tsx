@@ -726,23 +726,37 @@ export default function Skills() {
                     >
                       上一题
                     </button>
-                    <div className="flex gap-2">
-                      {/* 题目导航点 */}
-                      <div className="flex items-center gap-1 mr-2">
-                        {INTERVIEW_QUESTIONS.map((q, i) => (
-                          <button
-                            key={q.id}
-                            onClick={() => setCurrentIdx(i)}
-                            className={`w-2 h-2 rounded-full transition-all ${
-                              i === currentIdx
-                                ? 'bg-gold w-4'
-                                : (answers[q.id] || '').trim()
-                                ? 'bg-positive'
-                                : 'bg-border-custom'
-                            }`}
-                            title={`第${i + 1}题`}
-                          />
-                        ))}
+                    <div className="flex gap-2 items-center">
+                      {/* 题目导航：可横向滚动，适配 20 题 */}
+                      <div className="flex items-center gap-1 mr-2 overflow-x-auto max-w-[40vw] no-scrollbar">
+                        {INTERVIEW_QUESTIONS.map((q, i) => {
+                          const isActive = i === currentIdx;
+                          const isAnswered = (answers[q.id] || '').trim().length > 0;
+                          const dimColor = DIMENSION_META.find((d) => d.key === q.dimension)?.color || '#D4A853';
+                          return (
+                            <button
+                              key={q.id}
+                              onClick={() => setCurrentIdx(i)}
+                              className={`flex-shrink-0 w-6 h-6 rounded text-[10px] font-medium transition-all border ${
+                                isActive
+                                  ? 'text-bg-base border-transparent'
+                                  : isAnswered
+                                  ? 'text-text-primary border-transparent'
+                                  : 'text-text-muted border-border-custom'
+                              }`}
+                              style={{
+                                backgroundColor: isActive
+                                  ? dimColor
+                                  : isAnswered
+                                  ? `${dimColor}40`
+                                  : 'transparent',
+                              }}
+                              title={`第${i + 1}题 · ${q.title}`}
+                            >
+                              {i + 1}
+                            </button>
+                          );
+                        })}
                       </div>
                       {currentIdx === INTERVIEW_QUESTIONS.length - 1 ? (
                         <button
