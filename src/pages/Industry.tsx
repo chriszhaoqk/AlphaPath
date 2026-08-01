@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
-import { FileText, Plus, PenLine, Trash2, X, ChevronRight, CheckCircle2, Circle, Tag, Save, Check } from 'lucide-react';
+import { FileText, Plus, PenLine, Trash2, X, ChevronRight, CheckCircle2, Circle, Tag, Save, Check, BookCheck } from 'lucide-react';
 import { useIndustryStore, type IndustryResearch } from '@/store/useIndustryStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
 import VoiceTextInput from '@/components/VoiceTextInput';
@@ -274,6 +274,15 @@ export default function IndustryPage() {
     await publishResearch(id);
   };
 
+  // 切换复习状态：未复习 → 已复习；已复习 → 取消复习
+  const handleToggleReview = async (research: IndustryResearch) => {
+    const nowReviewed = !research.reviewed;
+    await updateResearch(research.id, {
+      reviewed: nowReviewed,
+      reviewedAt: nowReviewed ? new Date().toISOString() : undefined,
+    });
+  };
+
   const addTag = () => {
     if (newTag.trim() && !form.tags.includes(newTag.trim())) {
       setForm({ ...form, tags: [...form.tags, newTag.trim()] });
@@ -320,8 +329,8 @@ export default function IndustryPage() {
           <p className="text-xl font-bold text-positive">{researches.filter((r) => r.status === 'published').length}</p>
         </div>
         <div className="card p-3 md:p-4">
-          <p className="text-xs text-text-muted mb-1">草稿</p>
-          <p className="text-xl font-bold text-gold">{researches.filter((r) => r.status === 'draft').length}</p>
+          <p className="text-xs text-text-muted mb-1">已复习</p>
+          <p className="text-xl font-bold text-emerald-400">{researches.filter((r) => r.reviewed).length}</p>
         </div>
         <div className="card p-3 md:p-4">
           <p className="text-xs text-text-muted mb-1">覆盖产业</p>
@@ -415,11 +424,19 @@ export default function IndustryPage() {
                           {research.subIndustry && (
                             <span className="tag text-xs border bg-text-secondary/10 text-text-secondary border-text-secondary/30">{research.subIndustry}</span>
                           )}
+                          {research.reviewed && (
+                            <span className="tag text-xs border bg-emerald-500/10 text-emerald-400 border-emerald-500/30 flex items-center gap-0.5">
+                              <BookCheck size={10} /> 已复习
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2 text-xs text-text-muted">
                           <span>{formatDate(research.date)}</span>
                           {research.participants && <span>· {research.participants}</span>}
                           <span>· {research.status === 'published' ? '已发布' : '草稿'}</span>
+                          {research.reviewed && research.reviewedAt && (
+                            <span>· 复习于 {formatDateTime(research.reviewedAt)}</span>
+                          )}
                         </div>
                       </div>
                       <ChevronRight
@@ -479,6 +496,25 @@ export default function IndustryPage() {
                             >
                               <CheckCircle2 size={12} />
                               发布
+                            </button>
+                          )}
+                          {research.reviewed ? (
+                            <button
+                              onClick={() => handleToggleReview(research)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                              title={`已复习于 ${research.reviewedAt ? formatDateTime(research.reviewedAt) : ''}，点击取消`}
+                            >
+                              <BookCheck size={12} />
+                              已复习
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleToggleReview(research)}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-colors"
+                              title="复习完成后点击标记"
+                            >
+                              <BookCheck size={12} />
+                              标记已复习
                             </button>
                           )}
                           <button

@@ -13,6 +13,8 @@ export interface IndustryResearch {
   investmentImplications: string;
   status: 'draft' | 'published';
   tags: string[];
+  reviewed?: boolean;        // 是否已复习
+  reviewedAt?: string;       // 最近一次复习时间
   created_at: string;
   updated_at: string;
 }
