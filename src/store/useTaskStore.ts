@@ -103,10 +103,10 @@ export const useTaskStore = create<TaskState>()(
     }),
     {
       name: 'alphapath-tasks',
-      version: 3,
+      version: 4,
       migrate: (persisted: any, version: number) => {
-        if (version < 3) {
-          // v3: 清空所有历史任务和总结数据（用户要求重置）
+        if (version < 4) {
+          // v4: 再次清空任务中心所有数据（用户要求重置）
           return {
             ...persisted,
             tasks: [],
