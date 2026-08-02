@@ -21,7 +21,6 @@ import {
   ChevronRight,
   Wallet,
   BookHeart,
-  Newspaper,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -30,7 +29,6 @@ const navItems = [
 
   { to: '/tasks', icon: CheckSquare, label: '任务中心' },
   { to: '/industry', icon: Building2, label: '产业调研' },
-  { to: '/reading', icon: Newspaper, label: '每日阅读' },
   { to: '/funds', icon: Wallet, label: '家庭资金' },
   { to: '/diary', icon: BookHeart, label: '个人日记' },
   { to: '/learning', icon: BookOpen, label: '学习追踪' },

@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import { useTaskStore, type Task, type Quadrant } from '@/store/useTaskStore';
 import DailyQuestionCard from '@/components/DailyQuestionCard';
-import DailyReadingCard from '@/components/DailyReadingCard';
 
 // 获取本地时区的日期字符串 YYYY-MM-DD（避免 toISOString 的 UTC 偏移问题）
 function getLocalDateString(date: Date): string {
@@ -41,7 +40,6 @@ const moduleCards: ModuleCard[] = [
   { to: '/schedule', icon: Calendar, title: '日程管理', subtitle: '每日安排', tint: 'border-blue-400/20', iconBg: 'bg-blue-500/15', iconColor: 'text-blue-400' },
   { to: '/tasks', icon: CheckCircle2, title: '任务中心', subtitle: '四象限管理', tint: 'border-urgent/20', iconBg: 'bg-urgent/15', iconColor: 'text-urgent' },
   { to: '/industry', icon: Building2, title: '产业调研', subtitle: '纪要管理', tint: 'border-emerald-400/20', iconBg: 'bg-emerald-500/15', iconColor: 'text-emerald-400' },
-  { to: '/reading', icon: FileText, title: '每日深度阅读', subtitle: 'AI 产业链报告', tint: 'border-blue-400/20', iconBg: 'bg-blue-500/15', iconColor: 'text-blue-400' },
   { to: '/learning', icon: BookOpen, title: '学习追踪', subtitle: '知识积累', tint: 'border-purple-400/20', iconBg: 'bg-purple-500/15', iconColor: 'text-purple-400' },
   { to: '/journal', icon: PenLine, title: '投资笔记', subtitle: '思考记录', tint: 'border-amber-400/20', iconBg: 'bg-amber-500/15', iconColor: 'text-amber-400' },
   { to: '/skills', icon: Radar, title: '头部基金面试题', subtitle: '季度面试', tint: 'border-cyan-400/20', iconBg: 'bg-cyan-500/15', iconColor: 'text-cyan-400' },
@@ -218,9 +216,6 @@ export default function Dashboard() {
 
       {/* 每日思考题（题库抽题 + AI 评分） */}
       <DailyQuestionCard />
-
-      {/* 每日深度阅读（4 大类报告） */}
-      <DailyReadingCard />
 
       {/* Quick Actions */}
       <div className="card p-4">
