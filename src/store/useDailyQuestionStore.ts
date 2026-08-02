@@ -51,6 +51,7 @@ interface DailyQuestionState {
   getRecentQuestions: (limit?: number) => DailyQuestion[];
   getStreakDays: () => number;  // 连续作答天数
   clearAll: () => void;
+  clearAllAnswers: () => void;  // 仅清空历史作答（保留题目）
 }
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
@@ -132,6 +133,7 @@ export const useDailyQuestionStore = create<DailyQuestionState>()(
       },
 
       clearAll: () => set({ questions: [], answers: [] }),
+      clearAllAnswers: () => set({ answers: [] }),
     }),
     {
       name: 'alphapath-daily-question',

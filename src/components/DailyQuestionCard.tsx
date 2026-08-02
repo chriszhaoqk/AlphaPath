@@ -21,6 +21,7 @@ import {
   BookOpen,
   History,
   Calendar,
+  Trash2,
 } from 'lucide-react';
 
 // 维度元数据
@@ -59,7 +60,7 @@ function getQuestionForDate(dateStr: string) {
 }
 
 export default function DailyQuestionCard() {
-  const { getAnswerByQuestionId, addAnswer, getStreakDays, answers } = useDailyQuestionStore();
+  const { getAnswerByQuestionId, addAnswer, getStreakDays, answers, clearAllAnswers } = useDailyQuestionStore();
   const aiConfigured = useAIStore((s) => s.isConfigured());
 
   const [showModal, setShowModal] = useState(false);
@@ -408,9 +409,24 @@ export default function DailyQuestionCard() {
                   共 {sortedHistory.length} 条记录 · 连续 {streak} 天
                 </p>
               </div>
-              <button onClick={closeHistory} className="text-text-muted hover:text-text-primary">
-                <X size={20} />
-              </button>
+              <div className="flex items-center gap-2">
+                {answers.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm('确定要清空所有历史作答记录吗？此操作不可恢复。')) {
+                        clearAllAnswers();
+                        setHistoryDetailId(null);
+                      }
+                    }}
+                    className="text-xs text-urgent hover:text-red-400 flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-urgent/10 transition-colors"
+                  >
+                    <Trash2 size={12} /> 清空
+                  </button>
+                )}
+                <button onClick={closeHistory} className="text-text-muted hover:text-text-primary">
+                  <X size={20} />
+                </button>
+              </div>
             </div>
 
             <div className="p-4">
