@@ -25,6 +25,17 @@ export interface DailyAnswer {
   feedback: string;          // HTML 点评
   improvements: string;      // HTML 修改建议
   evaluatedAt: string;
+  // 题目快照（避免题库变更后历史记录丢失内容）
+  questionSnapshot: {
+    dimension: string;
+    title: string;
+    scenario: string;
+    prompt: string;
+    source: string;
+    category: string;
+    referenceAnswer: string;
+    referenceKeywords: string[];
+  };
 }
 
 interface DailyQuestionState {
@@ -124,7 +135,30 @@ export const useDailyQuestionStore = create<DailyQuestionState>()(
     }),
     {
       name: 'alphapath-daily-question',
-      version: 1,
+      version: 2,
+      migrate: (persisted: any, version: number) => {
+        if (version < 2) {
+          // v2: 新增 questionSnapshot 字段，旧作答数据补默认空快照
+          const defaultSnapshot = {
+            dimension: 'review',
+            title: '（历史题目，内容未保存）',
+            scenario: '',
+            prompt: '',
+            source: '',
+            category: '',
+            referenceAnswer: '<p>该作答记录创建于新版题目快照功能上线前，参考答案未保存。</p>',
+            referenceKeywords: [],
+          };
+          return {
+            ...persisted,
+            answers: (persisted?.answers || []).map((a: any) => ({
+              ...a,
+              questionSnapshot: a.questionSnapshot || defaultSnapshot,
+            })),
+          };
+        }
+        return persisted;
+      },
     }
   )
 );

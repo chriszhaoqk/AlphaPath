@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   useDailyQuestionStore,
@@ -19,6 +19,8 @@ import {
   ChevronRight,
   Flame,
   BookOpen,
+  History,
+  Calendar,
 } from 'lucide-react';
 
 // 维度元数据
@@ -51,18 +53,19 @@ function parseScoreResult(raw: string): { score: number; level: string; feedback
 
 // 按日期哈希从题库抽题：同一天始终是同一题，跨日轮换
 function getQuestionForDate(dateStr: string) {
-  // 简单哈希：YYYY-MM-DD -> 索引
   const hash = dateStr.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const idx = hash % INTERVIEW_QUESTIONS.length;
   return INTERVIEW_QUESTIONS[idx];
 }
 
 export default function DailyQuestionCard() {
-  const { getAnswerByQuestionId, addAnswer, getStreakDays } = useDailyQuestionStore();
+  const { getAnswerByQuestionId, addAnswer, getStreakDays, answers } = useDailyQuestionStore();
   const aiConfigured = useAIStore((s) => s.isConfigured());
 
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyDetailId, setHistoryDetailId] = useState<string | null>(null);
 
   // 答题状态
   const [answer, setAnswer] = useState('');
@@ -71,10 +74,20 @@ export default function DailyQuestionCard() {
 
   const today = getTodayDateStr();
   const todayQuestion = getQuestionForDate(today);
-  // 用 "date_questionId" 作为唯一 key，保证同一天换题时旧作答不冲突
   const answerKey = `${today}_${todayQuestion.id}`;
   const todayAnswer = getAnswerByQuestionId(answerKey);
   const streak = getStreakDays();
+
+  // 历史作答：按日期倒序
+  const sortedHistory = useMemo(() => {
+    return [...answers].sort((a, b) => b.date.localeCompare(a.date));
+  }, [answers]);
+
+  // 历史详情
+  const historyDetail = useMemo(() => {
+    if (!historyDetailId) return null;
+    return answers.find((a) => a.questionId === historyDetailId) || null;
+  }, [answers, historyDetailId]);
 
   // 提交作答
   const submitAnswer = async () => {
@@ -112,6 +125,17 @@ export default function DailyQuestionCard() {
         feedback: result.feedback || '<p>无点评</p>',
         improvements: result.improvements || '<p>无建议</p>',
         evaluatedAt: new Date().toISOString(),
+        // 题目快照：保留当时的题目内容，即使后续题库变更也能回看
+        questionSnapshot: {
+          dimension: todayQuestion.dimension,
+          title: todayQuestion.title,
+          scenario: todayQuestion.scenario,
+          prompt: todayQuestion.prompt,
+          source: todayQuestion.source,
+          category: todayQuestion.category,
+          referenceAnswer: todayQuestion.referenceAnswer,
+          referenceKeywords: todayQuestion.referenceKeywords,
+        },
       };
       addAnswer(evaluated);
     } catch (err: any) {
@@ -136,6 +160,16 @@ export default function DailyQuestionCard() {
     setAnswer('');
   };
 
+  const openHistory = () => {
+    setShowHistory(true);
+    setHistoryDetailId(null);
+  };
+
+  const closeHistory = () => {
+    setShowHistory(false);
+    setHistoryDetailId(null);
+  };
+
   // 卡片状态判定
   const status: 'unanswered' | 'answered' = todayAnswer ? 'answered' : 'unanswered';
   const dimMeta = DIMENSION_META[todayQuestion.dimension] || DIMENSION_META.review;
@@ -149,11 +183,22 @@ export default function DailyQuestionCard() {
             <Brain size={16} className="text-purple-400" />
             每日思考题
           </h2>
-          {streak > 0 && (
-            <span className="text-xs text-orange-400 flex items-center gap-0.5">
-              <Flame size={12} /> {streak}天
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {streak > 0 && (
+              <span className="text-xs text-orange-400 flex items-center gap-0.5">
+                <Flame size={12} /> {streak}天
+              </span>
+            )}
+            {answers.length > 0 && (
+              <button
+                onClick={openHistory}
+                className="text-xs text-text-muted hover:text-gold flex items-center gap-0.5 transition-colors"
+                title="查看历史作答记录"
+              >
+                <History size={12} /> {answers.length}条记录
+              </button>
+            )}
+          </div>
         </div>
 
         <button
@@ -337,6 +382,163 @@ export default function DailyQuestionCard() {
                   {!aiConfigured && (
                     <p className="text-[10px] text-text-muted mt-2 text-center">需在设置中配置 AI 后才能评分</p>
                   )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* 弹窗：历史作答记录 */}
+      {showHistory && createPortal(
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4" onClick={closeHistory}>
+          <div
+            className="card max-w-2xl w-full max-h-[92vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 头部 */}
+            <div className="sticky top-0 bg-card border-b border-border-custom p-4 flex justify-between items-center z-10">
+              <div>
+                <h3 className="text-lg font-bold text-text-primary font-display flex items-center gap-2">
+                  <History size={18} className="text-gold" />
+                  历史作答
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  共 {sortedHistory.length} 条记录 · 连续 {streak} 天
+                </p>
+              </div>
+              <button onClick={closeHistory} className="text-text-muted hover:text-text-primary">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-4">
+              {sortedHistory.length === 0 ? (
+                <div className="py-12 text-center text-text-muted text-sm">
+                  暂无历史作答记录
+                </div>
+              ) : historyDetail ? (
+                // 单条详情视图
+                <div className="space-y-3">
+                  <button
+                    onClick={() => setHistoryDetailId(null)}
+                    className="text-xs text-gold flex items-center gap-1 hover:underline"
+                  >
+                    ← 返回列表
+                  </button>
+
+                  {/* 题目 */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full"
+                        style={{
+                          backgroundColor: `${DIMENSION_META[historyDetail.questionSnapshot.dimension]?.color || '#F59E0B'}20`,
+                          color: DIMENSION_META[historyDetail.questionSnapshot.dimension]?.color || '#F59E0B',
+                        }}
+                      >
+                        {DIMENSION_META[historyDetail.questionSnapshot.dimension]?.label || '复盘'}
+                      </span>
+                      <span className="text-xs text-text-muted">{historyDetail.questionSnapshot.source}</span>
+                      <span
+                        className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        style={{
+                          backgroundColor: `${getScoreColor(historyDetail.score)}20`,
+                          color: getScoreColor(historyDetail.score),
+                        }}
+                      >
+                        {historyDetail.score}/10 · {historyDetail.level}
+                      </span>
+                    </div>
+                    <h4 className="text-base font-semibold text-text-primary mb-2">{historyDetail.questionSnapshot.title}</h4>
+                    <p className="text-sm text-text-secondary leading-relaxed mb-2 bg-ink rounded-lg p-3 border border-border-custom">
+                      {historyDetail.questionSnapshot.scenario}
+                    </p>
+                    <p className="text-sm text-text-primary leading-relaxed">{historyDetail.questionSnapshot.prompt}</p>
+                    <p className="text-xs text-text-muted mt-2 flex items-center gap-1">
+                      <Calendar size={11} /> 作答日期：{historyDetail.date}
+                    </p>
+                  </div>
+
+                  {/* 我的作答 */}
+                  <div className="pt-3 border-t border-border-custom">
+                    <p className="text-xs text-text-muted mb-1">我的作答</p>
+                    <div className="text-sm text-text-secondary bg-[#0D1117] rounded p-3 max-h-48 overflow-y-auto whitespace-pre-wrap border border-border-custom">
+                      {historyDetail.answer}
+                    </div>
+                  </div>
+
+                  {/* AI 点评 */}
+                  <div>
+                    <p className="text-xs text-gold mb-1 flex items-center gap-1">
+                      <Sparkles size={12} /> AI 点评
+                    </p>
+                    <div
+                      className="prose-sm text-xs text-text-primary bg-ink rounded p-3 border border-border-custom"
+                      dangerouslySetInnerHTML={{ __html: historyDetail.feedback }}
+                    />
+                  </div>
+
+                  {/* 修改建议 */}
+                  <div>
+                    <p className="text-xs text-purple-400 mb-1 flex items-center gap-1">
+                      <Brain size={12} /> 修改建议
+                    </p>
+                    <div
+                      className="prose-sm text-xs text-text-secondary bg-ink rounded p-3 border border-border-custom"
+                      dangerouslySetInnerHTML={{ __html: historyDetail.improvements }}
+                    />
+                  </div>
+
+                  {/* 参考答案 */}
+                  <div>
+                    <p className="text-xs text-emerald-400 mb-1 flex items-center gap-1">
+                      <BookOpen size={12} /> 参考答案
+                    </p>
+                    <div
+                      className="prose-sm text-xs text-text-primary bg-emerald-500/5 rounded p-3 border border-emerald-500/20"
+                      dangerouslySetInnerHTML={{ __html: historyDetail.questionSnapshot.referenceAnswer }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                // 列表视图
+                <div className="space-y-2">
+                  {sortedHistory.map((a) => {
+                    const dimColor = DIMENSION_META[a.questionSnapshot.dimension]?.color || '#F59E0B';
+                    const dimLabel = DIMENSION_META[a.questionSnapshot.dimension]?.label || '复盘';
+                    return (
+                      <button
+                        key={a.questionId}
+                        onClick={() => setHistoryDetailId(a.questionId)}
+                        className="w-full text-left bg-ink rounded-lg p-3 border border-border-custom hover:border-gold/30 transition-colors active:scale-[0.98]"
+                      >
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded font-medium"
+                            style={{ backgroundColor: `${dimColor}20`, color: dimColor }}
+                          >
+                            {dimLabel}
+                          </span>
+                          <span className="text-[10px] text-text-muted flex items-center gap-0.5">
+                            <Calendar size={9} /> {a.date}
+                          </span>
+                          <span
+                            className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold ml-auto"
+                            style={{
+                              backgroundColor: `${getScoreColor(a.score)}20`,
+                              color: getScoreColor(a.score),
+                            }}
+                          >
+                            {a.score}/10 · {a.level}
+                          </span>
+                        </div>
+                        <p className="text-sm font-medium text-text-primary mb-1 line-clamp-1">{a.questionSnapshot.title}</p>
+                        <p className="text-xs text-text-muted line-clamp-2">{a.answer.slice(0, 80)}{a.answer.length > 80 ? '...' : ''}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
