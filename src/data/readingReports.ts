@@ -12,7 +12,7 @@ export interface ReadingTopic {
   category: ReadingCategory;
   title: string;              // 报告主题
   subtitle: string;           // 副标题（简短描述）
-  sources: string[];          // 推荐信息源（券商/机构/媒体）
+  sources: string[];          // 推荐信息源（官方一手/学术研究/权威机构）
   keyAngles: string[];        // 阅读时关注的关键角度
   keyMetrics: string[];       // 需要跟踪的核心指标
   relatedTickers: string[];   // 相关标的（用于投资转化）
@@ -54,7 +54,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'macro',
     title: '美联储议息会议纪要深度解读',
     subtitle: 'FOMC 会议纪要 + 点阵图 + 经济预测',
-    sources: ['美联储官网', '中金宏观', '天风宏观', '国君宏观', '彭博'],
+    sources: ['美联储官网（FOMC 原文）', 'Fed Minutes 原文', 'BIS 季度评论', 'FT Lex', 'Bloomberg Economics'],
     keyAngles: [
       '官员分歧度（鹰鸽分布）与未来降息路径',
       '对通胀"最后一公里"的判断（核心 PCE 黏性）',
@@ -71,7 +71,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'macro',
     title: '美国 CPI/PCE 通胀结构拆解',
     subtitle: '商品/服务/住房/超级核心通胀分项',
-    sources: ['BLS', 'BEA', '中金', '申万宏观', '高盛宏观'],
+    sources: ['BLS 官网（CPI/PPI 原文）', 'BEA 国民收入报告（PCE 原文）', 'NBER 工作论文', 'AEA Papers and Proceedings', 'Bloomberg Intelligence'],
     keyAngles: [
       '住房通胀滞后性 vs 市场租金领先指标',
       '超级核心通胀（服务剔除住房）与工资增速',
@@ -88,7 +88,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'macro',
     title: '中国金融数据与社融结构分析',
     subtitle: 'M1/M2/社融/信贷/政府债',
-    sources: ['央行', '中金宏观', '广发宏观', '天风宏观', 'Wind'],
+    sources: ['中国人民银行官网（金融统计）', '国家统计局', 'IMF Article IV（中国）', 'BIS 季度评论', 'CEIC 全球数据库'],
     keyAngles: [
       'M1-M2 剪刀差与经济活跃度',
       '社融结构（政府债 vs 信贷 vs 直接融资）',
@@ -105,7 +105,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'macro',
     title: '全球美元流动性周期与新兴市场资金流',
     subtitle: '美元指数/美债/跨境资本流/EM 资产',
-    sources: ['BIS', 'IMF', 'EPFR', '中金海外', '招商宏观'],
+    sources: ['BIS 季度评论', 'IMF WEO/GFSR 原文', 'IIF 资本流动报告', 'EPFR Global', '纽约联储流动性数据'],
     keyAngles: [
       '美元流动性三因子（美债/美元/利差）',
       '外资流入 A 股/港股的领先指标',
@@ -122,7 +122,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'macro',
     title: '商品周期与铜油背离信号',
     subtitle: '铜/油/黄金/铁矿的宏观信号',
-    sources: ['高盛商品', '托克研究', '中信期货', '南华商品'],
+    sources: ['IEA 月度原油报告', 'OPEC 月度石油市场报告', '世界银行商品市场展望', 'LME 市场报告', 'USGS 矿产商品年报'],
     keyAngles: [
       '铜油比与全球需求预期',
       '黄金与实际利率背离的尾部风险定价',
@@ -141,7 +141,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'llm',
     title: 'OpenAI 与 Anthropic 前沿模型能力追踪',
     subtitle: 'GPT 系列 / Claude 系列 / 推理能力',
-    sources: ['OpenAI Blog', 'Anthropic', 'SemiAnalysis', 'The Information', '机器之心'],
+    sources: ['OpenAI 官方博客/技术报告', 'Anthropic 官方博客/模型卡', 'SemiAnalysis', 'arXiv（CS.CL）', 'NeurIPS/ICML 论文'],
     keyAngles: [
       '推理模型（o1/o3）与传统模型的范式差异',
       '上下文长度与有效利用率的瓶颈',
@@ -158,7 +158,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'llm',
     title: '国产大模型竞争格局（DeepSeek/豆包/Kimi/通义）',
     subtitle: '开源 vs 闭源 / 推理模型 / 多模态',
-    sources: ['DeepSeek', '字节豆包', '月之暗面', '阿里通义', '36 氪', '量子位'],
+    sources: ['DeepSeek 技术报告', '字节豆包官方', '月之暗面官方', '阿里通义官方', 'SemiAnalysis', 'arXiv（CS.CL）'],
     keyAngles: [
       'DeepSeek 的成本效率突破与开源策略影响',
       '豆包的 C 端分发优势与商业化路径',
@@ -175,7 +175,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'llm',
     title: '大模型推理成本下降与商业化加速',
     subtitle: '推理优化/蒸馏/量化/Token 价格战',
-    sources: ['SemiAnalysis', 'Artificial Analysis', 'Latent Space', '机器之心'],
+    sources: ['SemiAnalysis', 'Artificial Analysis', 'arXiv（CS.LG）', 'MLPerf 基准', 'Epoch AI'],
     keyAngles: [
       '推理成本每年 10x 下降的可持续性',
       '蒸馏与量化对模型质量的影响',
@@ -192,7 +192,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'llm',
     title: 'AI Agent 与工具调用能力演进',
     subtitle: 'Function Calling / Computer Use / 多步推理',
-    sources: ['OpenAI', 'Anthropic', 'LangChain', 'The Information', '机器之心'],
+    sources: ['OpenAI 官方文档', 'Anthropic 官方博客', 'LangChain 官方文档', 'arXiv（CS.AI）', 'SWE-Bench / WebArena 基准'],
     keyAngles: [
       'Agent 框架（LangGraph/AutoGen）的工程化进展',
       'Computer Use 与 RPA 的替代边界',
@@ -209,7 +209,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'llm',
     title: '大模型训练数据瓶颈与合成数据',
     subtitle: '数据耗尽 / 合成数据 / 数据飞轮',
-    sources: ['Epoch AI', 'SemiAnalysis', 'arXiv', 'The Information'],
+    sources: ['Epoch AI', 'SemiAnalysis', 'arXiv（CS.CL）', 'Common Crawl', 'Hugging Face 数据集'],
     keyAngles: [
       '高质量互联网数据的耗尽时间预测',
       '合成数据（Distillation/RLAIF）的有效性边界',
@@ -228,7 +228,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'ai_hardware',
     title: 'GPU 产业链（英伟达/AMD/国产算力）',
     subtitle: 'H100/B100/MI300/昇腾/产能与需求',
-    sources: ['英伟达财报', 'AMD 财报', 'SemiAnalysis', 'TrendForce', '光大电子'],
+    sources: ['英伟达财报/IR', 'AMD 财报/IR', 'SemiAnalysis', 'TrendForce', '台积电法说会'],
     keyAngles: [
       'B100/B200 产能与客户订单能见度',
       'CoWoS 封装产能瓶颈与扩产节奏',
@@ -245,7 +245,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'ai_hardware',
     title: 'HBM 存储产业链（海力士/三星/长鑫）',
     subtitle: 'HBM3e/HBM4/产能/国产替代',
-    sources: ['SK 海力士', '三星电子', 'TrendForce', '国金电子', '兆易创新公告'],
+    sources: ['SK 海力士 IR', '三星电子 IR', 'TrendForce', 'JEDEC 标准', 'Yole Group'],
     keyAngles: [
       'HBM3e vs HBM4 的技术路线与单卡容量',
       '海力士/三星/美光份额格局',
@@ -262,7 +262,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'ai_hardware',
     title: 'CPO/NPO 光互联产业链',
     subtitle: '共封装光学/硅光/光引擎/电芯片',
-    sources: ['Broadcom', 'Marvell', '台积电', 'Coherent', '中际旭创', '天风通信'],
+    sources: ['Broadcom IR', 'Marvell IR', '台积电法说会', 'Coherent IR', 'LightCounting', 'IEEE 802.3 标准'],
     keyAngles: [
       'CPO vs NPO vs 可插拔的技术路线博弈',
       '硅光集成与光引擎的成本临界点',
@@ -279,7 +279,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'ai_hardware',
     title: '服务器 CPU 产业链（Intel/AMD/ARM）',
     subtitle: '至强/EPYC/Grace/国产 CPU',
-    sources: ['Intel', 'AMD', 'ARM', 'TrendForce', '国海计算机'],
+    sources: ['Intel IR', 'AMD IR', 'ARM IR', 'TrendForce', 'Mercury Research'],
     keyAngles: [
       'AMD EPYC 份额持续提升对 Intel 的冲击',
       'ARM 服务器渗透率（Grace/Amazon Graviton/Ampere）',
@@ -296,7 +296,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'ai_hardware',
     title: 'AI 数据中心电力与散热产业链',
     subtitle: 'HVDC/液冷/UPS/燃气轮机/核电',
-    sources: ['Vertiv', 'Eaton', '施耐德', 'GE Vernova', '天风电新', '长江电新'],
+    sources: ['Vertiv IR', 'Eaton IR', '施耐德电气 IR', 'GE Vernova IR', 'IEA 电力报告', 'Uptime Institute'],
     keyAngles: [
       '单机柜功率从 30kW 到 100kW+ 的演进',
       '液冷（冷板式 vs 浸没式）渗透率与成本',
@@ -315,7 +315,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'csp',
     title: '微软云（Azure）AI 增长与 OpenAI 绑定',
     subtitle: 'Azure AI 收入/OpenAI 利润分成/Capex',
-    sources: ['微软财报', '微软投资人会议', '彭博', '中金海外', '天风海外'],
+    sources: ['微软财报/IR', '微软 Build 大会', 'Synergy Research Group', 'Gartner', 'Canalys'],
     keyAngles: [
       'Azure AI 服务收入贡献度（8-10pp 增长贡献）',
       'OpenAI 利润分成与 IP 授权收入',
@@ -332,7 +332,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'csp',
     title: '谷歌云（GCP）TPU 自研与 Gemini 商业化',
     subtitle: 'TPU v6/Trillium/Gemini/广告 AI',
-    sources: ['Alphabet 财报', 'DeepMind', '彭博', '高盛', '中金海外'],
+    sources: ['Alphabet 财报/IR', 'DeepMind 官方博客', 'Synergy Research Group', 'Gartner', 'Canalys'],
     keyAngles: [
       'TPU 自研对英伟达依赖的替代节奏',
       'Gemini 模型在企业搜索/Workspace 的渗透',
@@ -349,7 +349,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'csp',
     title: '亚马逊 AWS AI 战略（Bedrock/Trainium）',
     subtitle: 'Trainium/Anthropic 投资/Bedrock 平台',
-    sources: ['AWS 财报', 're:Invent', '彭博', '摩根士丹利', '中金海外'],
+    sources: ['亚马逊财报/IR', 'AWS re:Invent 大会', 'Synergy Research Group', 'Gartner', 'Canalys'],
     keyAngles: [
       'Trainium 自研芯片对客户成本优势',
       'Anthropic 投资与 AWS 独家云绑定',
@@ -366,7 +366,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'csp',
     title: '阿里云 AI 增长与通义模型商业化',
     subtitle: '通义千问/公有云/海外扩张',
-    sources: ['阿里巴巴财报', '阿里云', '中金互联网', '天风互联网'],
+    sources: ['阿里巴巴财报/IR', '阿里云官网', 'Synergy Research Group', 'Gartner', 'IDC China'],
     keyAngles: [
       '阿里云 AI 相关收入占比与增速',
       '通义千问开源 vs 闭源的商业化平衡',
@@ -383,7 +383,7 @@ export const READING_TOPICS: ReadingTopic[] = [
     category: 'csp',
     title: '腾讯云与字节火山引擎 AI 战略对比',
     subtitle: '混元/豆包/企业微信/视频号',
-    sources: ['腾讯财报', '字节跳动', '火山引擎', '中金互联网', '招商互联网'],
+    sources: ['腾讯财报/IR', '火山引擎官网', 'Synergy Research Group', 'Gartner', 'IDC China'],
     keyAngles: [
       '腾讯混元在微信/企业微信的内部渗透',
       '字节豆包的 C 端流量与 B 端火山引擎联动',
