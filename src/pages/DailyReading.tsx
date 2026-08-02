@@ -435,13 +435,20 @@ export default function DailyReadingPage() {
               {/* 推荐信息源 */}
               <div>
                 <p className="text-xs text-text-secondary mb-2 flex items-center gap-1">
-                  <ExternalLink size={11} /> 推荐信息源
+                  <ExternalLink size={11} /> 推荐信息源（点击查看原文）
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedTopic.sources.map((s) => (
-                    <span key={s} className="text-xs px-2 py-1 rounded-full bg-ink border border-border-custom text-text-secondary">
-                      {s}
-                    </span>
+                    <a
+                      key={s.url}
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs px-2 py-1 rounded-full bg-ink border border-border-custom text-text-secondary hover:border-gold/40 hover:text-gold active:scale-95 transition-all flex items-center gap-1"
+                    >
+                      <ExternalLink size={10} />
+                      {s.name}
+                    </a>
                   ))}
                 </div>
               </div>

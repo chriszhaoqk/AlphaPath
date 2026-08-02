@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { ReadingCategory } from '@/data/readingReports';
+import type { ReadingCategory, ReadingSource } from '@/data/readingReports';
 
 // 单次阅读记录
 export interface ReadingRecord {
@@ -10,7 +10,7 @@ export interface ReadingRecord {
     category: ReadingCategory;
     title: string;
     subtitle: string;
-    sources: string[];
+    sources: ReadingSource[];
     keyAngles: string[];
     keyMetrics: string[];
     relatedTickers: string[];
