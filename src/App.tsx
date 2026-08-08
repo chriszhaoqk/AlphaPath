@@ -13,6 +13,7 @@ import Dashboard from '@/pages/Dashboard';
 import IndustryPage from '@/pages/Industry';
 import FundsPage from '@/pages/Funds';
 import DiaryPage from '@/pages/Diary';
+import NewsPage from '@/pages/News';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, checkAuth } = useAuthStore();
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/industry" element={<IndustryPage />} />
           <Route path="/funds" element={<FundsPage />} />
           <Route path="/diary" element={<DiaryPage />} />
+          <Route path="/news" element={<NewsPage />} />
           <Route path="/learning" element={<LearningPage />} />
           <Route path="/journal" element={<JournalPage />} />
           <Route path="/skills" element={<Skills />} />

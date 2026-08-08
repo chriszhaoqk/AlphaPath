@@ -3,6 +3,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useSyncStore } from '@/store/useSyncStore';
 import { useAIStore, AI_PROVIDERS } from '@/store/useAIStore';
 import { testAIConnection } from '@/lib/ai';
+import { useNewsStore } from '@/store/useNewsStore';
 import {
   Cloud,
   CloudOff,
@@ -23,6 +24,7 @@ import {
   EyeOff,
   Loader2,
   ExternalLink,
+  Newspaper,
 } from 'lucide-react';
 
 export default function Settings() {
@@ -49,6 +51,10 @@ export default function Settings() {
   const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'success' | 'error'>('idle');
   const [aiTestMessage, setAiTestMessage] = useState('');
   const [aiCustomModel, setAiCustomModel] = useState(aiStore.model);
+
+  // 新闻 API 配置
+  const newsStore = useNewsStore();
+  const [newsKeyInput, setNewsKeyInput] = useState('');
 
   const handleSaveAiKey = () => {
     if (aiKeyInput.trim()) {
@@ -615,6 +621,66 @@ export default function Settings() {
             <p className="text-text-muted mt-1">
               配置完成后，前往「任务中心」点击「AI 生成总结」体验深度分析。
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* 新闻 API 配置 */}
+      <section>
+        <h2 className="text-sm font-semibold text-text-primary mb-3 flex items-center gap-2">
+          <Newspaper size={16} className="text-gold" />
+          新闻 API 配置
+        </h2>
+        <div className="card p-4 md:p-5 space-y-4">
+          <p className="text-xs text-text-muted">
+            配置 GNews API Key 后，每日新闻页面将自动获取全球官方新闻源的实时资讯。免费版每日 100 次请求，可覆盖 7 个分类。
+          </p>
+
+          <div>
+            <label className="block text-xs text-text-secondary mb-2">GNews API Key</label>
+            {newsStore.apiKey ? (
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 bg-ink border border-border-custom rounded-lg px-3 py-2 text-sm text-text-muted overflow-hidden">
+                    {'••••••••••••' + newsStore.apiKey.slice(-8)}
+                  </div>
+                  <button
+                    onClick={() => { newsStore.setApiKey(''); }}
+                    className="px-3 py-2 text-xs border border-urgent/30 rounded-lg text-urgent active:bg-urgent/10"
+                  >
+                    清除
+                  </button>
+                </div>
+                <p className="text-xs text-positive flex items-center gap-1">
+                  <Check size={12} /> API Key 已保存
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  value={newsKeyInput}
+                  onChange={(e) => setNewsKeyInput(e.target.value)}
+                  placeholder="gnews_xxx..."
+                  className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-sm text-text-primary focus:outline-none focus:border-gold/50"
+                />
+                <button
+                  onClick={() => { if (newsKeyInput.trim()) { newsStore.setApiKey(newsKeyInput.trim()); setNewsKeyInput(''); } }}
+                  disabled={!newsKeyInput.trim()}
+                  className="px-3 py-2 text-xs btn-gold disabled:opacity-40"
+                >
+                  保存 API Key
+                </button>
+              </div>
+            )}
+            <a
+              href="https://gnews.io/"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 mt-2 text-xs text-gold hover:underline"
+            >
+              <ExternalLink size={11} /> 免费获取 GNews API Key
+            </a>
           </div>
         </div>
       </section>
