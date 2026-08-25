@@ -1,45 +1,50 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useEditor, EditorContent } from '@tiptap/react';
+import { BubbleMenu } from '@tiptap/react/menus';
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import LinkExtension from '@tiptap/extension-link';
+import ImageExtension from '@tiptap/extension-image';
+import TextAlign from '@tiptap/extension-text-align';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
+import Highlight from '@tiptap/extension-highlight';
+import Color from '@tiptap/extension-color';
+import { TextStyle } from '@tiptap/extension-text-style';
+import FontFamily from '@tiptap/extension-font-family';
+import { Table } from '@tiptap/extension-table';
+import TableRow from '@tiptap/extension-table-row';
+import TableCell from '@tiptap/extension-table-cell';
+import TableHeader from '@tiptap/extension-table-header';
+import Placeholder from '@tiptap/extension-placeholder';
+import HorizontalRule from '@tiptap/extension-horizontal-rule';
+import CharacterCount from '@tiptap/extension-character-count';
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import { common, createLowlight } from 'lowlight';
 import {
-  X,
-  Bold,
-  Italic,
-  Underline,
-  List,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-  Indent,
-  Type,
-  Paperclip,
-  Eye,
-  Trash2,
-  Sparkles,
-  FileText,
-  Image as ImageIcon,
-  File,
-  Loader2,
-  Download,
-  XCircle,
-  Mic,
-  GripVertical,
-  Table,
-  Undo2,
-  Redo2,
-  Palette,
-  Save,
-  Check,
+  X, Bold, Italic, Underline as UnderlineIcon, Strikethrough,
+  List, ListOrdered, CheckSquare, Quote, Code, Code2,
+  AlignLeft, AlignCenter, AlignRight,
+  Link, Image as ImageIcon, Table as TableIcon, Minus,
+  Undo2, Redo2, Palette, Type, PaintBucket,
+  Paperclip, Eye, Trash2, Sparkles, FileText, File,
+  Loader2, Download, XCircle, Mic, GripVertical,
+  Check, Heading1, Heading2, Heading3, Heading4,
+  RemoveFormatting, Pilcrow,
 } from 'lucide-react';
 import { useAttachmentStore, generateAttachmentSummary, type Attachment } from '@/store/useAttachmentStore';
-import VoiceInput, { isVoiceSupported } from '@/components/VoiceInput';
+import VoiceInput from '@/components/VoiceInput';
+
+const lowlight = createLowlight(common);
 
 interface FullscreenEditorProps {
   label: string;
   value: string;
-  onSave: (html: string) => void;           // 手动保存（点击完成/Ctrl+S），调用方应关闭窗口
+  onSave: (html: string) => void;
   onClose: () => void;
-  onAutoSave?: (html: string) => void;      // 自动保存（30秒/关闭前），调用方仅更新内容，不应关闭窗口
-  parentId?: string; // for attachments, e.g. "industry-abc123"
+  onAutoSave?: (html: string) => void;
+  parentId?: string;
 }
 
 function getFileIcon(fileType: string) {
@@ -54,34 +59,37 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)}MB`;
 }
 
-export default function FullscreenEditor({ label, value, onSave, onClose, onAutoSave, parentId }: FullscreenEditorProps) {
-  const editorRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [fontSize, setFontSize] = useState(14);
-  const [wordCount, setWordCount] = useState(0);
+const PRESET_COLORS = [
+  '#E8E8E8', '#9CA3AF', '#D4A853', '#F59E0B',
+  '#EF4444', '#EC4899', '#A855F7', '#3B82F6',
+  '#10B981', '#14B8A6', '#6366F1', '#FFFFFF',
+];
 
-  // 悬浮窗拖拽状态
+const PRESET_HIGHLIGHTS = [
+  '#D4A85333', '#EF444433', '#10B98133', '#3B82F633',
+  '#A855F733', '#F59E0B33', '#EC489933', '#FFFFFF22',
+];
+
+const FONT_SIZES = [12, 13, 14, 15, 16, 18, 20, 24, 28, 32];
+
+export default function FullscreenEditor({ label, value, onSave, onClose, onAutoSave, parentId }: FullscreenEditorProps) {
+  // --- Drag state ---
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, posX: 0, posY: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // 限制位置，确保标题栏始终可见（基于初始居中位置计算，不受 transform 影响）
   const clampPosition = useCallback((x: number, y: number) => {
     const container = containerRef.current;
     if (!container) return { x, y };
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    // 使用 offsetWidth/offsetHeight 不受 transform 影响
     const w = container.offsetWidth;
     const h = container.offsetHeight;
-    // 弹窗居中时，左边缘到视口左边的距离
     const centeredLeft = (vw - w) / 2;
     const centeredTop = (vh - h) / 2;
-    // 允许左右移动，保留至少 120px 可见
     const maxX = Math.max(0, w / 2 - 120);
     const minX = -maxX;
-    // 顶部不能超出视口上边缘（标题栏必须可见），底部保留至少 60px
     const minY = -centeredTop + 8;
     const maxY = vh - centeredTop - h - 8;
     return {
@@ -90,53 +98,45 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
     };
   }, []);
 
-  // 标题栏拖拽起点（鼠标）
   const handleHeaderMouseDown = useCallback((e: React.MouseEvent) => {
-    // 不拦截按钮点击
     if ((e.target as HTMLElement).closest('button, select')) return;
     e.preventDefault();
     setIsDragging(true);
     dragStart.current = {
-      x: e.clientX,
-      y: e.clientY,
-      posX: position.x,
-      posY: position.y,
+      x: e.clientX, y: e.clientY,
+      posX: position.x, posY: position.y,
     };
   }, [position]);
 
-  // 标题栏拖拽起点（触摸）
   const handleHeaderTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length !== 1) return;
     if ((e.target as HTMLElement).closest('button, select')) return;
     setIsDragging(true);
     dragStart.current = {
-      x: e.touches[0].clientX,
-      y: e.touches[0].clientY,
-      posX: position.x,
-      posY: position.y,
+      x: e.touches[0].clientX, y: e.touches[0].clientY,
+      posX: position.x, posY: position.y,
     };
   }, [position]);
 
   useEffect(() => {
     if (!isDragging) return;
-
     const handleMove = (e: MouseEvent) => {
-      const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
-      setPosition(clampPosition(dragStart.current.posX + dx, dragStart.current.posY + dy));
+      setPosition(clampPosition(
+        dragStart.current.posX + e.clientX - dragStart.current.x,
+        dragStart.current.posY + e.clientY - dragStart.current.y,
+      ));
     };
     const handleUp = () => setIsDragging(false);
-
     const handleTouchMove = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       e.preventDefault();
       const t = e.touches[0];
-      const dx = t.clientX - dragStart.current.x;
-      const dy = t.clientY - dragStart.current.y;
-      setPosition(clampPosition(dragStart.current.posX + dx, dragStart.current.posY + dy));
+      setPosition(clampPosition(
+        dragStart.current.posX + t.clientX - dragStart.current.x,
+        dragStart.current.posY + t.clientY - dragStart.current.y,
+      ));
     };
     const handleTouchEnd = () => setIsDragging(false);
-
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
     window.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -149,151 +149,132 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
     };
   }, [isDragging, clampPosition]);
 
-  // Attachments
+  // --- Attachments ---
   const { getAttachments, addAttachment, removeAttachment, updateAttachmentSummary } = useAttachmentStore();
   const attachments = parentId ? getAttachments(parentId) : [];
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
-
-  // Preview
   const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
-
-  // AI summary
   const [summarizingId, setSummarizingId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Table insertion
+  // --- Link dialog ---
+  const [linkDialog, setLinkDialog] = useState<{ open: boolean; url: string }>({ open: false, url: '' });
+
+  // --- Table picker ---
   const [showTablePicker, setShowTablePicker] = useState(false);
   const [tableRows, setTableRows] = useState(3);
   const [tableCols, setTableCols] = useState(3);
 
-  // 自动保存状态：null=未触发, 'auto'=自动保存, 'manual'=手动保存
+  // --- Color pickers ---
+  const [showColorPicker, setShowColorPicker] = useState<'text' | 'highlight' | null>(null);
+  const [showFontSize, setShowFontSize] = useState(false);
+
+  // --- Save hint ---
   const [saveHint, setSaveHint] = useState<{ type: 'auto' | 'manual'; at: number } | null>(null);
   const lastSavedHtml = useRef<string>('');
 
-  // 字体颜色选择器
-  const [showColorPicker, setShowColorPicker] = useState(false);
-  const PRESET_COLORS = [
-    '#E8E8E8', '#9CA3AF', '#D4A853', '#F59E0B',
-    '#EF4444', '#EC4899', '#A855F7', '#3B82F6',
-    '#10B981', '#14B8A6', '#6366F1', '#FFFFFF',
-  ];
+  // --- TipTap Editor ---
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        codeBlock: false,
+        heading: { levels: [1, 2, 3, 4] },
+      }),
+      Underline,
+      TextStyle,
+      Color,
+      FontFamily,
+      Highlight.configure({ multicolor: true }),
+      LinkExtension.configure({
+        openOnClick: false,
+        HTMLAttributes: { class: 'editor-link' },
+      }),
+      ImageExtension.configure({
+        inline: false,
+        HTMLAttributes: { class: 'editor-image' },
+      }),
+      TextAlign.configure({ types: ['heading', 'paragraph'] }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Table.configure({ resizable: true }),
+      TableRow,
+      TableCell,
+      TableHeader,
+      HorizontalRule,
+      Placeholder.configure({ placeholder: '开始输入...（输入 / 插入各类内容）' }),
+      CharacterCount.configure({ limit: 100000 }),
+      CodeBlockLowlight.configure({ lowlight }),
+    ],
+    content: value || '',
+    onUpdate: ({ editor }) => {
+      setWordCount(editor.storage.characterCount.characters());
+    },
+    editorProps: {
+      attributes: {
+        class: 'tiptap-editor prose prose-sm max-w-none focus:outline-none',
+      },
+      handlePaste: (_view, event) => {
+        const items = event.clipboardData?.items;
+        if (!items) return false;
+        for (const item of Array.from(items)) {
+          if (item.type.startsWith('image/')) {
+            event.preventDefault();
+            const file = item.getAsFile();
+            if (!file) continue;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              const dataUrl = ev.target?.result as string;
+              editor?.chain().focus().setImage({ src: dataUrl }).run();
+            };
+            reader.readAsDataURL(file);
+            return true;
+          }
+        }
+        return false;
+      },
+    },
+  });
 
-  // 表格编辑菜单：点击单元格时弹出
-  const [tableMenu, setTableMenu] = useState<{ x: number; y: number; cell: HTMLTableCellElement } | null>(null);
+  const [wordCount, setWordCount] = useState(0);
 
-  // Insert table into editor
-  const insertTable = useCallback(() => {
-    if (!editorRef.current) return;
-    editorRef.current.focus();
-    const rows = Math.max(1, tableRows);
-    const cols = Math.max(1, tableCols);
-    let html = '<table style="border-collapse:collapse; width:100%; margin:0.5em 0;">';
-    // Header row
-    html += '<tr>';
-    for (let c = 0; c < cols; c++) {
-      html += `<th style="border:1px solid #2A3040; padding:6px 10px; background:#1A1F2E; color:#D4A853; font-size:0.9em; text-align:left;">标题${c + 1}</th>`;
-    }
-    html += '</tr>';
-    // Data rows
-    for (let r = 0; r < rows - 1; r++) {
-      html += '<tr>';
-      for (let c = 0; c < cols; c++) {
-        html += `<td style="border:1px solid #2A3040; padding:6px 10px; font-size:0.9em;">&nbsp;</td>`;
-      }
-      html += '</tr>';
-    }
-    html += '</table><p><br/></p>';
-    document.execCommand('insertHTML', false, html);
-    setShowTablePicker(false);
-    updateWordCount();
-  }, [tableRows, tableCols]);
-
-  // Voice input handler
-  const handleVoiceInput = useCallback((text: string) => {
-    if (editorRef.current) {
-      editorRef.current.focus();
-      document.execCommand('insertText', false, text);
-      updateWordCount();
-    }
-  }, []);
-
+  // Sync word count on mount
   useEffect(() => {
-    if (editorRef.current) {
-      if (value && value.includes('<')) {
-        editorRef.current.innerHTML = value;
-      } else if (value) {
-        const paragraphs = value.split('\n').filter((p: string) => p.trim());
-        editorRef.current.innerHTML = paragraphs
-          .map((p: string) => `<p style="text-indent:2em; margin-bottom:0.5em;">${p}</p>`)
-          .join('');
-      } else {
-        editorRef.current.innerHTML = '';
+    if (editor) {
+      setWordCount(editor.storage.characterCount.characters());
+      editor.commands.focus('end');
+    }
+  }, [editor]);
+
+  // Auto-save every 30s
+  useEffect(() => {
+    if (!editor) return;
+    const timer = setInterval(() => {
+      handleSave('auto');
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [editor]);
+
+  // Cleanup: save on unmount
+  useEffect(() => {
+    return () => {
+      if (editor && !editor.isDestroyed) {
+        const html = editor.getHTML();
+        if (html && html !== lastSavedHtml.current) {
+          if (onAutoSave) onAutoSave(html);
+          else onSave(html);
+        }
       }
-      lastSavedHtml.current = editorRef.current.innerHTML;
-      updateWordCount();
-    }
-  }, []);
+    };
+  }, [editor]);
 
-  const updateWordCount = () => {
-    if (editorRef.current) {
-      const text = editorRef.current.innerText || '';
-      setWordCount(text.replace(/\s/g, '').length);
-    }
-  };
-
-  const execCmd = (cmd: string, val?: string) => {
-    editorRef.current?.focus();
-    document.execCommand(cmd, false, val);
-    updateWordCount();
-  };
-
-  const handleFontSize = (size: number) => {
-    setFontSize(size);
-    const selection = window.getSelection();
-    if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0);
-      if (!range.collapsed) {
-        document.execCommand('fontSize', false, '7');
-        const fontElements = editorRef.current?.querySelectorAll('font[size="7"]');
-        fontElements?.forEach((el) => {
-          const span = document.createElement('span');
-          span.style.fontSize = `${size}px`;
-          span.innerHTML = el.innerHTML;
-          el.replaceWith(span);
-        });
-      }
-    }
-  };
-
-  const handleIndent = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-
-    let node: Node | null = selection.anchorNode;
-    while (node && node !== editorRef.current) {
-      if (node instanceof HTMLParagraphElement || node instanceof HTMLDivElement) {
-        const currentIndent = (node as HTMLElement).style.textIndent;
-        (node as HTMLElement).style.textIndent = currentIndent === '2em' ? '0em' : '2em';
-        return;
-      }
-      node = node.parentNode;
-    }
-
-    execCmd('formatBlock', 'p');
-    const p = editorRef.current?.querySelector('p:last-of-type');
-    if (p instanceof HTMLParagraphElement) {
-      p.style.textIndent = '2em';
-    }
-  };
-
-  const handleSave = (type: 'auto' | 'manual' = 'manual') => {
-    const html = editorRef.current?.innerHTML || '';
-    if (type === 'auto' && html === lastSavedHtml.current) return; // 无变化不保存
+  const handleSave = useCallback((type: 'auto' | 'manual' = 'manual') => {
+    if (!editor || editor.isDestroyed) return;
+    const html = editor.getHTML();
+    if (type === 'auto' && html === lastSavedHtml.current) return;
     if (type === 'auto') {
-      // 自动保存：仅同步内容到父组件状态，不关闭窗口
       onAutoSave?.(html);
     } else {
-      // 手动保存：调用方负责关闭窗口
       onSave(html);
     }
     lastSavedHtml.current = html;
@@ -301,263 +282,89 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
     if (type === 'manual') {
       setTimeout(() => setSaveHint(null), 2000);
     }
-  };
+  }, [editor, onSave, onAutoSave]);
 
-  // 自动保存：每30秒检查一次
-  useEffect(() => {
-    const timer = setInterval(() => {
-      handleSave('auto');
-    }, 30000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // 关闭前自动保存（不关闭窗口，仅同步内容；若手动点完成则 onSave 已处理）
-  useEffect(() => {
-    return () => {
-      const html = editorRef.current?.innerHTML || '';
-      if (html && html !== lastSavedHtml.current) {
-        // 优先用 onAutoSave（不触发关闭），无则回退到 onSave
-        if (onAutoSave) onAutoSave(html);
-        else onSave(html);
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 字体颜色
-  const handleForeColor = (color: string) => {
-    editorRef.current?.focus();
-    document.execCommand('foreColor', false, color);
-    setShowColorPicker(false);
-    updateWordCount();
-  };
-
-  // 撤销/重做
-  const handleUndo = () => {
-    editorRef.current?.focus();
-    document.execCommand('undo', false);
-    updateWordCount();
-  };
-  const handleRedo = () => {
-    editorRef.current?.focus();
-    document.execCommand('redo', false);
-    updateWordCount();
-  };
-
-  // 键盘快捷键：Ctrl+Z 撤销, Ctrl+Y / Ctrl+Shift+Z 重做, Ctrl+S 保存
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.ctrlKey || e.metaKey) {
-      if (e.key === 'z' && !e.shiftKey) {
-        e.preventDefault();
-        handleUndo();
-      } else if ((e.key === 'y') || (e.key === 'z' && e.shiftKey)) {
-        e.preventDefault();
-        handleRedo();
-      } else if (e.key === 's') {
-        e.preventDefault();
-        handleSave('manual');
+  // --- Toolbar actions ---
+  const execAction = useCallback((action: string, value?: string) => {
+    if (!editor) return;
+    const chain = editor.chain().focus();
+    switch (action) {
+      case 'bold': chain.toggleBold().run(); break;
+      case 'italic': chain.toggleItalic().run(); break;
+      case 'underline': chain.toggleUnderline().run(); break;
+      case 'strike': chain.toggleStrike().run(); break;
+      case 'code': chain.toggleCode().run(); break;
+      case 'highlight': chain.toggleHighlight().run(); break;
+      case 'bulletList': chain.toggleBulletList().run(); break;
+      case 'orderedList': chain.toggleOrderedList().run(); break;
+      case 'taskList': chain.toggleTaskList().run(); break;
+      case 'blockquote': chain.toggleBlockquote().run(); break;
+      case 'codeBlock': chain.toggleCodeBlock().run(); break;
+      case 'horizontalRule': chain.setHorizontalRule().run(); break;
+      case 'alignLeft': chain.setTextAlign('left').run(); break;
+      case 'alignCenter': chain.setTextAlign('center').run(); break;
+      case 'alignRight': chain.setTextAlign('right').run(); break;
+      case 'heading': chain.toggleHeading({ level: parseInt(value || '1') as 1|2|3|4 }).run(); break;
+      case 'undo': chain.undo().run(); break;
+      case 'redo': chain.redo().run(); break;
+      case 'clearFormat': chain.clearNodes().unsetAllMarks().run(); break;
+      case 'paragraph': chain.setParagraph().run(); break;
+      case 'setColor': chain.setColor(value || '#FFFFFF').run(); break;
+      case 'unsetColor': chain.unsetColor().run(); break;
+      case 'setHighlight': chain.toggleHighlight({ color: value }).run(); break;
+      case 'setFontSize': {
+        const selection = editor.state.selection;
+        if (!selection.empty) {
+          editor.commands.setMark('textStyle', { fontSize: `${value}px` });
+        }
+        break;
       }
     }
-  };
+  }, [editor]);
 
-  // 点击外部关闭颜色选择器
-  useEffect(() => {
-    if (!showColorPicker) return;
-    const handler = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest('[data-color-picker]')) {
-        setShowColorPicker(false);
-      }
-    };
-    setTimeout(() => document.addEventListener('click', handler), 0);
-    return () => document.removeEventListener('click', handler);
-  }, [showColorPicker]);
-
-  // 表格操作工具条：点击表格单元格时显示
-  const [tableToolbar, setTableToolbar] = useState<{ rowIdx: number; colIdx: number } | null>(null);
-
-  // 点击编辑器内表格单元格时显示工具条
-  useEffect(() => {
-    const editor = editorRef.current;
+  // Insert table
+  const insertTable = useCallback(() => {
     if (!editor) return;
-    const handleClick = (e: Event) => {
-      const target = e.target as HTMLElement;
-      const cell = target.closest('td, th') as HTMLTableCellElement | null;
-      const table = target.closest('table') as HTMLTableElement | null;
-      if (cell && table && target.closest('[contenteditable]')) {
-        const rowIdx = Array.from(table.rows).indexOf(cell.parentElement as HTMLTableRowElement);
-        const colIdx = Array.from((cell.parentElement as HTMLTableRowElement).cells).indexOf(cell);
-        setTableToolbar({ rowIdx, colIdx });
-      } else {
-        setTableToolbar(null);
-      }
-    };
-    editor.addEventListener('click', handleClick);
-    return () => editor.removeEventListener('click', handleClick);
-  }, []);
+    editor.chain().focus().insertTable({
+      rows: Math.max(1, tableRows),
+      cols: Math.max(1, tableCols),
+      withHeaderRow: true,
+    }).run();
+    setShowTablePicker(false);
+  }, [editor, tableRows, tableCols]);
 
-  // 表格增删行列操作
-  const tableAddRowBelow = () => {
-    if (!tableToolbar) return;
-    const editor = editorRef.current;
+  // Insert link
+  const handleInsertLink = useCallback(() => {
     if (!editor) return;
-    const table = editor.querySelector('table');
-    if (!table) return;
-    const refRow = table.rows[tableToolbar.rowIdx];
-    if (!refRow) return;
-    const cols = refRow.cells.length;
-    const newRow = table.insertRow(tableToolbar.rowIdx + 1);
-    for (let c = 0; c < cols; c++) {
-      const cell = newRow.insertCell();
-      cell.style.border = '1px solid #2A3040';
-      cell.style.padding = '6px 10px';
-      cell.style.fontSize = '0.9em';
-      cell.innerHTML = '&nbsp;';
+    const previousUrl = editor.getAttributes('link').href;
+    setLinkDialog({ open: true, url: previousUrl || '' });
+  }, [editor]);
+
+  const confirmLink = useCallback(() => {
+    if (!editor) return;
+    const url = linkDialog.url;
+    if (url === '') {
+      editor.chain().focus().extendMarkRange('link').unsetLink().run();
+    } else {
+      const finalUrl = url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+      editor.chain().focus().extendMarkRange('link').setLink({ href: finalUrl }).run();
     }
-    setTableToolbar(null);
-    updateWordCount();
-  };
+    setLinkDialog({ open: false, url: '' });
+  }, [editor, linkDialog.url]);
 
-  const tableDeleteRow = () => {
-    if (!tableToolbar) return;
-    const editor = editorRef.current;
-    if (!editor) return;
-    const table = editor.querySelector('table');
-    if (!table) return;
-    if (table.rows.length <= 1) return; // 至少保留一行
-    table.deleteRow(tableToolbar.rowIdx);
-    setTableToolbar(null);
-    updateWordCount();
-  };
-
-  const tableAddColRight = () => {
-    if (!tableToolbar) return;
-    const editor = editorRef.current;
-    if (!editor) return;
-    const table = editor.querySelector('table');
-    if (!table) return;
-    for (let r = 0; r < table.rows.length; r++) {
-      const row = table.rows[r];
-      const isHeader = row.cells[0]?.tagName === 'TH';
-      const cell = row.insertCell(tableToolbar.colIdx + 1);
-      if (isHeader) {
-        const th = document.createElement('th');
-        th.style.border = '1px solid #2A3040';
-        th.style.padding = '6px 10px';
-        th.style.background = '#1A1F2E';
-        th.style.color = '#D4A853';
-        th.style.fontSize = '0.9em';
-        th.style.textAlign = 'left';
-        th.textContent = '标题';
-        cell.replaceWith(th);
-      } else {
-        cell.style.border = '1px solid #2A3040';
-        cell.style.padding = '6px 10px';
-        cell.style.fontSize = '0.9em';
-        cell.innerHTML = '&nbsp;';
-      }
+  // Voice input
+  const handleVoiceInput = useCallback((text: string) => {
+    if (editor) {
+      editor.chain().focus().insertContent(text).run();
     }
-    setTableToolbar(null);
-    updateWordCount();
-  };
-
-  const tableDeleteCol = () => {
-    if (!tableToolbar) return;
-    const editor = editorRef.current;
-    if (!editor) return;
-    const table = editor.querySelector('table');
-    if (!table) return;
-    const colCount = table.rows[0]?.cells.length || 0;
-    if (colCount <= 1) return; // 至少保留一列
-    for (let r = 0; r < table.rows.length; r++) {
-      table.rows[r].deleteCell(tableToolbar.colIdx);
-    }
-    setTableToolbar(null);
-    updateWordCount();
-  };
-
-  // Paste image handler
-  const handlePaste = useCallback((e: React.ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-    for (const item of Array.from(items)) {
-      if (item.type.startsWith('image/')) {
-        e.preventDefault();
-        const file = item.getAsFile();
-        if (!file) continue;
-        const reader = new FileReader();
-        reader.onload = (ev) => {
-          const dataUrl = ev.target?.result as string;
-          if (editorRef.current) {
-            editorRef.current.focus();
-            const imgHtml = `<img src="${dataUrl}" style="max-width:100%; height:auto; cursor:nwse-resize; display:block; margin:0.5em 0; border-radius:6px;" />`;
-            document.execCommand('insertHTML', false, imgHtml);
-            updateWordCount();
-          }
-        };
-        reader.readAsDataURL(file);
-        return;
-      }
-    }
-  }, []);
-
-  // Image resize: click to select, drag corner to resize
-  useEffect(() => {
-    const editor = editorRef.current;
-    if (!editor) return;
-
-    const handleClick = (e: Event) => {
-      const target = e.target as HTMLElement;
-      // Remove previous selection
-      editor.querySelectorAll('img[data-selected]').forEach((img) => {
-        img.removeAttribute('data-selected');
-        img.style.outline = '';
-      });
-      if (target.tagName === 'IMG' && target.closest('[contenteditable]')) {
-        target.setAttribute('data-selected', 'true');
-        target.style.outline = '2px solid #D4A853';
-      }
-    };
-
-    const handleMouseDown = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName !== 'IMG' || !target.closest('[contenteditable]')) return;
-      e.preventDefault();
-      const img = target as HTMLImageElement;
-      const startX = (e as MouseEvent).clientX;
-      const startWidth = img.offsetWidth;
-      const startHeight = img.offsetHeight;
-      const ratio = startHeight / startWidth;
-
-      const handleMouseMove = (me: MouseEvent) => {
-        const dx = me.clientX - startX;
-        const newWidth = Math.max(50, startWidth + dx);
-        img.style.width = `${newWidth}px`;
-        img.style.height = `${newWidth * ratio}px`;
-      };
-      const handleMouseUp = () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-      };
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-    };
-
-    editor.addEventListener('click', handleClick);
-    editor.addEventListener('mousedown', handleMouseDown);
-    return () => {
-      editor.removeEventListener('click', handleClick);
-      editor.removeEventListener('mousedown', handleMouseDown);
-    };
-  }, []);
+  }, [editor]);
 
   // File upload
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || !parentId) return;
-
     setUploadError('');
     setUploading(true);
-
     try {
       for (const file of Array.from(files)) {
         await addAttachment(parentId, file);
@@ -574,8 +381,6 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
   const handleAISummary = (attachment: Attachment) => {
     if (!parentId) return;
     setSummarizingId(attachment.id);
-
-    // Simulate AI processing delay
     setTimeout(() => {
       const summary = generateAttachmentSummary(attachment);
       updateAttachmentSummary(parentId, attachment.id, summary);
@@ -583,7 +388,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
     }, 1200);
   };
 
-  // Download attachment
+  // Download
   const handleDownload = (attachment: Attachment) => {
     const link = document.createElement('a');
     link.href = attachment.data;
@@ -591,28 +396,283 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
     link.click();
   };
 
-  const TOOLBAR_ITEMS = [
-    { icon: Undo2, action: handleUndo, title: '撤销 (Ctrl+Z)' },
-    { icon: Redo2, action: handleRedo, title: '重做 (Ctrl+Y)' },
-    { sep: true },
-    { icon: Bold, cmd: 'bold', title: '加粗' },
-    { icon: Italic, cmd: 'italic', title: '斜体' },
-    { icon: Underline, cmd: 'underline', title: '下划线' },
-    { sep: true },
-    { icon: AlignLeft, cmd: 'justifyLeft', title: '左对齐' },
-    { icon: AlignCenter, cmd: 'justifyCenter', title: '居中' },
-    { icon: AlignRight, cmd: 'justifyRight', title: '右对齐' },
-    { sep: true },
-    { icon: List, cmd: 'insertUnorderedList', title: '无序列表' },
-    { icon: Indent, action: handleIndent, title: '首行缩进' },
-    { sep: true },
-    { icon: Table, action: () => setShowTablePicker(true), title: '插入表格' },
-  ];
+  // Table toolbar
+  const [tableToolbar, setTableToolbar] = useState<{ rowIdx: number; colIdx: number } | null>(null);
+
+  useEffect(() => {
+    if (!editor) return;
+    const editorEl = editor.view.dom;
+    const handleClick = () => {
+      if (editor.isActive('table')) {
+        const { view } = editor;
+        const pos = view.state.selection.$anchor;
+        const node = pos.node(pos.depth);
+        if (node.type.name === 'table') {
+          // Find table element
+          const tables = editorEl.querySelectorAll('table');
+          for (const table of Array.from(tables)) {
+            if (table.contains(view.domAtPos(pos.pos).node)) {
+              // Try to find the cell
+            }
+          }
+        }
+        // Simplified: just show toolbar when table is active
+        setTableToolbar({ rowIdx: 0, colIdx: 0 });
+      } else {
+        setTableToolbar(null);
+      }
+    };
+    editorEl.addEventListener('click', handleClick);
+    return () => editorEl.removeEventListener('click', handleClick);
+  }, [editor]);
+
+  const tableAddRow = () => editor?.chain().focus().addRowAfter().run();
+  const tableDeleteRow = () => editor?.chain().focus().deleteRow().run();
+  const tableAddCol = () => editor?.chain().focus().addColumnAfter().run();
+  const tableDeleteCol = () => editor?.chain().focus().deleteColumn().run();
+  const tableDelete = () => editor?.chain().focus().deleteTable().run();
+
+  // Close color pickers on outside click
+  useEffect(() => {
+    if (!showColorPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (!(e.target as HTMLElement).closest('[data-color-picker]')) {
+        setShowColorPicker(null);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', handler), 0);
+    return () => document.removeEventListener('click', handler);
+  }, [showColorPicker]);
+
+  // -- Toolbar configuration --
+  interface ToolbarBtn {
+    icon: any;
+    action: string;
+    value?: string;
+    title: string;
+    isActive?: () => boolean;
+  }
+
+  const getToolbarGroups = (): (ToolbarBtn | 'sep')[][] => {
+    if (!editor) return [];
+    return [
+      // Group 1: Undo/Redo
+      [
+        { icon: Undo2, action: 'undo', title: '撤销 (Ctrl+Z)' },
+        { icon: Redo2, action: 'redo', title: '重做 (Ctrl+Y)' },
+      ],
+      // Group 2: Text formatting
+      [
+        { icon: Bold, action: 'bold', title: '加粗 (Ctrl+B)', isActive: () => editor.isActive('bold') },
+        { icon: Italic, action: 'italic', title: '斜体 (Ctrl+I)', isActive: () => editor.isActive('italic') },
+        { icon: UnderlineIcon, action: 'underline', title: '下划线 (Ctrl+U)', isActive: () => editor.isActive('underline') },
+        { icon: Strikethrough, action: 'strike', title: '删除线', isActive: () => editor.isActive('strike') },
+        { icon: Code, action: 'code', title: '行内代码', isActive: () => editor.isActive('code') },
+      ],
+      // Group 3: Highlight & Color
+      [
+        { icon: PaintBucket, action: 'highlight', title: '高亮', isActive: () => editor.isActive('highlight') },
+        { icon: Palette, action: 'color', title: '字体颜色', isActive: () => editor.isActive('textStyle') },
+      ],
+      // Group 4: Headings & Paragraph
+      [
+        { icon: Pilcrow, action: 'paragraph', title: '正文', isActive: () => editor.isActive('paragraph') },
+        { icon: Heading1, action: 'heading', value: '1', title: '标题1', isActive: () => editor.isActive('heading', { level: 1 }) },
+        { icon: Heading2, action: 'heading', value: '2', title: '标题2', isActive: () => editor.isActive('heading', { level: 2 }) },
+        { icon: Heading3, action: 'heading', value: '3', title: '标题3', isActive: () => editor.isActive('heading', { level: 3 }) },
+        { icon: Heading4, action: 'heading', value: '4', title: '标题4', isActive: () => editor.isActive('heading', { level: 4 }) },
+      ],
+      // Group 5: Lists
+      [
+        { icon: List, action: 'bulletList', title: '无序列表', isActive: () => editor.isActive('bulletList') },
+        { icon: ListOrdered, action: 'orderedList', title: '有序列表', isActive: () => editor.isActive('orderedList') },
+        { icon: CheckSquare, action: 'taskList', title: '任务列表', isActive: () => editor.isActive('taskList') },
+      ],
+      // Group 6: Blocks
+      [
+        { icon: Quote, action: 'blockquote', title: '引用', isActive: () => editor.isActive('blockquote') },
+        { icon: Code2, action: 'codeBlock', title: '代码块', isActive: () => editor.isActive('codeBlock') },
+        { icon: Minus, action: 'horizontalRule', title: '分割线' },
+      ],
+      // Group 7: Alignment
+      [
+        { icon: AlignLeft, action: 'alignLeft', title: '左对齐', isActive: () => editor.isActive({ textAlign: 'left' }) },
+        { icon: AlignCenter, action: 'alignCenter', title: '居中', isActive: () => editor.isActive({ textAlign: 'center' }) },
+        { icon: AlignRight, action: 'alignRight', title: '右对齐', isActive: () => editor.isActive({ textAlign: 'right' }) },
+      ],
+      // Group 8: Insert
+      [
+        { icon: Link, action: 'link', title: '插入链接' },
+        { icon: ImageIcon, action: 'image', title: '插入图片' },
+        { icon: TableIcon, action: 'table', title: '插入表格' },
+      ],
+      // Group 9: Clear
+      [
+        { icon: RemoveFormatting, action: 'clearFormat', title: '清除格式' },
+      ],
+    ];
+  };
+
+  const renderToolbarBtn = (btn: ToolbarBtn, idx: number) => {
+    const isActive = btn.isActive?.() ?? false;
+    const Icon = btn.icon;
+    const isSpecial = btn.action === 'link' || btn.action === 'image' || btn.action === 'table' || btn.action === 'color' || btn.action === 'highlight';
+    return (
+      <button
+        key={idx}
+        onClick={() => {
+          if (btn.action === 'link') handleInsertLink();
+          else if (btn.action === 'image') {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = (e) => {
+              const file = (e.target as HTMLInputElement).files?.[0];
+              if (file && editor) {
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                  editor.chain().focus().setImage({ src: ev.target?.result as string }).run();
+                };
+                reader.readAsDataURL(file);
+              }
+            };
+            input.click();
+          }
+          else if (btn.action === 'table') setShowTablePicker(true);
+          else if (btn.action === 'color') setShowColorPicker(showColorPicker === 'text' ? null : 'text');
+          else if (btn.action === 'highlight') setShowColorPicker(showColorPicker === 'highlight' ? null : 'highlight');
+          else execAction(btn.action, btn.value);
+        }}
+        className={`p-1.5 rounded-lg text-text-secondary hover:text-gold hover:bg-gold/10 transition-all flex items-center justify-center ${
+          isActive ? 'bg-gold/15 text-gold ring-1 ring-gold/30' : ''
+        } ${isSpecial ? 'bg-gold/5 text-gold border border-gold/10' : ''}`}
+        title={btn.title}
+      >
+        <Icon size={15} />
+      </button>
+    );
+  };
+
+  const renderToolbar = () => {
+    if (!editor) return null;
+    const groups = getToolbarGroups();
+    return (
+      <div className="flex items-center gap-1 px-3 py-2 border-b border-border-custom bg-ink/50 flex-wrap flex-shrink-0 overflow-x-auto">
+        {groups.map((group, gi) => (
+          <span key={gi} className="flex items-center gap-0.5">
+            {gi > 0 && <div className="w-px h-5 bg-border-custom mx-1" />}
+            {group.map((item, i) =>
+              item === 'sep' ? (
+                <div key={i} className="w-px h-5 bg-border-custom mx-1" />
+              ) : (
+                renderToolbarBtn(item, i)
+              )
+            )}
+          </span>
+        ))}
+
+        {/* Font size */}
+        <div className="w-px h-5 bg-border-custom mx-1" />
+        <div className="relative">
+          <button
+            onClick={() => setShowFontSize(!showFontSize)}
+            className="px-2 py-1 rounded text-xs text-text-secondary hover:text-gold hover:bg-gold/10 transition-colors border border-border-custom"
+          >
+            {editor?.getAttributes('textStyle').fontSize?.replace('px', '') || '14'}px
+          </button>
+          {showFontSize && (
+            <div className="absolute top-full left-0 mt-1 p-1.5 bg-ink border border-border-custom rounded-lg shadow-xl z-10 max-h-48 overflow-y-auto">
+              {FONT_SIZES.map((s) => (
+                <button
+                  key={s}
+                  onClick={() => {
+                    execAction('setFontSize', String(s));
+                    setShowFontSize(false);
+                  }}
+                  className="block w-full text-left px-3 py-1.5 text-xs text-text-secondary hover:text-gold hover:bg-gold/10 rounded transition-colors"
+                >
+                  {s}px
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Voice input */}
+        <VoiceInput onTextReceived={handleVoiceInput} buttonSize="sm" />
+
+        {/* File upload */}
+        {parentId && (
+          <>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="p-1.5 rounded text-text-secondary hover:text-gold hover:bg-gold/10 transition-colors flex items-center gap-1"
+              title="上传附件"
+            >
+              {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              onChange={handleFileUpload}
+              className="hidden"
+              accept="image/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx"
+            />
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // --- Color picker overlay ---
+  const renderColorPicker = () => {
+    if (!showColorPicker) return null;
+    const isHighlight = showColorPicker === 'highlight';
+    return (
+      <div
+        className="absolute top-full left-0 mt-1 p-2 bg-ink border border-border-custom rounded-lg shadow-xl z-10"
+        data-color-picker
+        style={{ minWidth: '180px' }}
+      >
+        <div className="text-xs text-text-muted mb-2 px-1">
+          {isHighlight ? '高亮颜色' : '字体颜色'}
+        </div>
+        <div className="grid grid-cols-6 gap-1.5 mb-2">
+          {(isHighlight ? PRESET_HIGHLIGHTS : PRESET_COLORS).map((c) => (
+            <button
+              key={c}
+              onClick={() => {
+                if (isHighlight) {
+                  editor?.chain().focus().toggleHighlight({ color: c }).run();
+                } else {
+                  execAction('setColor', c);
+                }
+                setShowColorPicker(null);
+              }}
+              className="w-7 h-7 rounded border border-border-custom hover:scale-110 transition-transform"
+              style={{ background: c }}
+            />
+          ))}
+        </div>
+        {!isHighlight && (
+          <button
+            onClick={() => {
+              execAction('unsetColor');
+              setShowColorPicker(null);
+            }}
+            className="text-xs text-text-muted hover:text-text-primary px-1"
+          >
+            清除颜色
+          </button>
+        )}
+      </div>
+    );
+  };
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4"
-    >
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-3 sm:p-4">
       <div
         ref={containerRef}
         className="w-full max-w-4xl h-[92vh] sm:h-[88vh] bg-ink border border-border-custom rounded-xl flex flex-col shadow-2xl"
@@ -621,12 +681,12 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',
         }}
       >
-        {/* Header - draggable */}
+        {/* Header */}
         <div
           data-drag-handle
           onMouseDown={handleHeaderMouseDown}
           onTouchStart={handleHeaderTouchStart}
-          className={`flex items-center justify-between px-4 py-2.5 border-b border-border-custom flex-shrink-0 cursor-move select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
+          className={`flex items-center justify-between px-4 py-3 border-b border-border-custom flex-shrink-0 cursor-move select-none ${isDragging ? 'cursor-grabbing' : 'cursor-grab'}`}
         >
           <div className="flex items-center gap-2">
             <GripVertical size={16} className="text-text-muted" />
@@ -656,146 +716,78 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
         </div>
 
         {/* Toolbar */}
-        <div className="flex items-center gap-0.5 px-3 py-2 border-b border-border-custom bg-ink/50 flex-wrap flex-shrink-0">
-          {TOOLBAR_ITEMS.map((item, i) => {
-            if ('sep' in item && item.sep) {
-              return <div key={i} className="w-px h-5 bg-border-custom mx-1.5" />;
-            }
-            const Icon = 'icon' in item ? item.icon : Type;
-            const isTableBtn = 'title' in item && item.title === '插入表格';
-            return (
-              <button
-                key={i}
-                onClick={() => {
-                  if ('action' in item && item.action) item.action();
-                  else if ('cmd' in item) execCmd(item.cmd);
-                }}
-                className={`p-1.5 rounded text-text-secondary hover:text-gold hover:bg-gold/10 transition-colors flex items-center gap-1 ${isTableBtn ? 'bg-gold/10 text-gold border border-gold/20' : ''}`}
-                title={'title' in item ? item.title : ''}
-              >
-                <Icon size={15} />
-                {isTableBtn && <span className="text-xs">表格</span>}
-              </button>
-            );
-          })}
+        {editor && renderToolbar()}
 
-          <div className="w-px h-5 bg-border-custom mx-1.5" />
-          <select
-            value={fontSize}
-            onChange={(e) => handleFontSize(Number(e.target.value))}
-            className="bg-ink border border-border-custom rounded px-1.5 py-0.5 text-xs text-text-primary focus:outline-none focus:border-gold/50"
-            title="字体大小"
-          >
-            {[12, 13, 14, 15, 16, 18, 20, 24].map((s) => (
-              <option key={s} value={s}>
-                {s}px
-              </option>
-            ))}
-          </select>
+        {/* Color picker positioned below toolbar */}
+        {showColorPicker && (
+          <div className="relative px-3">
+            {renderColorPicker()}
+          </div>
+        )}
 
-          <div className="w-px h-5 bg-border-custom mx-1.5" />
-          <select
-            onChange={(e) => {
-              if (e.target.value) execCmd('formatBlock', e.target.value);
-            }}
-            className="bg-ink border border-border-custom rounded px-1.5 py-0.5 text-xs text-text-primary focus:outline-none focus:border-gold/50"
-            title="段落格式"
-            defaultValue=""
-          >
-            <option value="" disabled>段落</option>
-            <option value="p">正文</option>
-            <option value="h2">标题2</option>
-            <option value="h3">标题3</option>
-            <option value="h4">标题4</option>
-            <option value="blockquote">引用</option>
-          </select>
+        {/* Editor area */}
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+          <div className="flex-1 overflow-y-auto px-4 py-3">
+            {editor && (
+              <>
+                <EditorContent editor={editor} className="min-h-full" />
 
-          {/* 字体颜色 */}
-          <div className="relative" data-color-picker>
-            <button
-              onClick={() => setShowColorPicker(!showColorPicker)}
-              className="p-1.5 rounded text-text-secondary hover:text-gold hover:bg-gold/10 transition-colors flex items-center gap-0.5"
-              title="字体颜色"
-            >
-              <Palette size={15} />
-              <span className="w-2 h-2 rounded-sm bg-gold inline-block" />
-            </button>
-            {showColorPicker && (
-              <div className="absolute top-full left-0 mt-1 p-2 bg-ink border border-border-custom rounded-lg shadow-xl z-10 grid grid-cols-6 gap-1">
-                {PRESET_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => handleForeColor(c)}
-                    className="w-6 h-6 rounded border border-border-custom hover:scale-110 transition-transform"
-                    style={{ background: c }}
-                    title={c}
-                  />
-                ))}
-              </div>
+                {/* Bubble menu on text selection */}
+                <BubbleMenu
+                  editor={editor}
+                  className="flex items-center gap-0.5 bg-[#0D1117] border border-gold/30 rounded-lg px-2 py-1.5 shadow-2xl"
+                  options={{ placement: 'top' }}
+                >
+                  <button onClick={() => execAction('bold')} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('bold') ? 'text-gold bg-gold/10' : ''}`} title="加粗">
+                    <Bold size={14} />
+                  </button>
+                  <button onClick={() => execAction('italic')} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('italic') ? 'text-gold bg-gold/10' : ''}`} title="斜体">
+                    <Italic size={14} />
+                  </button>
+                  <button onClick={() => execAction('underline')} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('underline') ? 'text-gold bg-gold/10' : ''}`} title="下划线">
+                    <UnderlineIcon size={14} />
+                  </button>
+                  <button onClick={() => execAction('strike')} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('strike') ? 'text-gold bg-gold/10' : ''}`} title="删除线">
+                    <Strikethrough size={14} />
+                  </button>
+                  <div className="w-px h-4 bg-border-custom mx-1" />
+                  <button onClick={() => execAction('code')} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('code') ? 'text-gold bg-gold/10' : ''}`} title="行内代码">
+                    <Code size={14} />
+                  </button>
+                  <button onClick={() => execAction('highlight')} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('highlight') ? 'text-gold bg-gold/10' : ''}`} title="高亮">
+                    <PaintBucket size={14} />
+                  </button>
+                  <div className="w-px h-4 bg-border-custom mx-1" />
+                  <button onClick={() => execAction('bulletList')} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('bulletList') ? 'text-gold bg-gold/10' : ''}`} title="无序列表">
+                    <List size={14} />
+                  </button>
+                  <button onClick={() => execAction('orderedList')} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('orderedList') ? 'text-gold bg-gold/10' : ''}`} title="有序列表">
+                    <ListOrdered size={14} />
+                  </button>
+                  <div className="w-px h-4 bg-border-custom mx-1" />
+                  <button onClick={() => handleInsertLink()} className={`p-1 rounded text-text-secondary hover:text-gold ${editor.isActive('link') ? 'text-gold bg-gold/10' : ''}`} title="链接">
+                    <Link size={14} />
+                  </button>
+                  <button onClick={() => setShowColorPicker(showColorPicker === 'text' ? null : 'text')} className="p-1 rounded text-text-secondary hover:text-gold" title="字体颜色">
+                    <Palette size={14} />
+                  </button>
+                </BubbleMenu>
+              </>
             )}
           </div>
 
-          {/* Voice input button */}
-          <div className="w-px h-5 bg-border-custom mx-1.5" />
-          <VoiceInput
-            onTextReceived={handleVoiceInput}
-            buttonSize="sm"
-          />
-
-          {/* File upload button */}
-          {parentId && (
-            <>
-              <div className="w-px h-5 bg-border-custom mx-1.5" />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="p-1.5 rounded text-text-secondary hover:text-gold hover:bg-gold/10 transition-colors flex items-center gap-1"
-                title="上传文件"
-              >
-                {uploading ? <Loader2 size={15} className="animate-spin" /> : <Paperclip size={15} />}
-                <span className="text-xs">附件</span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                multiple
-                onChange={handleFileUpload}
-                className="hidden"
-                accept="image/*,.pdf,.txt,.md,.csv,.json,.doc,.docx,.xls,.xlsx"
-              />
-            </>
-          )}
-        </div>
-
-        {/* Editor + Attachments area */}
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-          {/* Editor */}
-          <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onInput={updateWordCount}
-            onPaste={handlePaste}
-            onKeyDown={handleKeyDown}
-            className="flex-1 overflow-y-auto px-5 py-4 text-text-primary leading-relaxed focus:outline-none"
-            style={{ fontSize: `${fontSize}px` }}
-          />
-
-          {/* 表格操作工具条 */}
-          {tableToolbar && (
-            <div
-              data-table-toolbar
-              className="absolute top-2 right-2 flex items-center gap-1 bg-[#0D1117] border border-gold/40 rounded-lg px-2 py-1 shadow-xl z-20"
-              onClick={(e) => e.stopPropagation()}
-            >
+          {/* Table toolbar overlay */}
+          {tableToolbar && editor?.isActive('table') && (
+            <div className="absolute top-2 right-2 flex items-center gap-1 bg-[#0D1117] border border-gold/40 rounded-lg px-2 py-1.5 shadow-xl z-20">
               <span className="text-xs text-text-muted px-1">表格</span>
               <div className="w-px h-4 bg-border-custom" />
-              <button onClick={tableAddRowBelow} className="text-xs text-text-secondary hover:text-gold px-1.5 py-0.5 hover:bg-gold/10 rounded" title="在下方插入行">+行</button>
-              <button onClick={tableDeleteRow} className="text-xs text-text-secondary hover:text-urgent px-1.5 py-0.5 hover:bg-urgent/10 rounded" title="删除当前行">-行</button>
+              <button onClick={tableAddRow} className="text-xs text-text-secondary hover:text-gold px-1.5 py-0.5 hover:bg-gold/10 rounded" title="插入行">+行</button>
+              <button onClick={tableDeleteRow} className="text-xs text-text-secondary hover:text-urgent px-1.5 py-0.5 hover:bg-urgent/10 rounded" title="删除行">-行</button>
               <div className="w-px h-4 bg-border-custom" />
-              <button onClick={tableAddColRight} className="text-xs text-text-secondary hover:text-gold px-1.5 py-0.5 hover:bg-gold/10 rounded" title="在右侧插入列">+列</button>
-              <button onClick={tableDeleteCol} className="text-xs text-text-secondary hover:text-urgent px-1.5 py-0.5 hover:bg-urgent/10 rounded" title="删除当前列">-列</button>
+              <button onClick={tableAddCol} className="text-xs text-text-secondary hover:text-gold px-1.5 py-0.5 hover:bg-gold/10 rounded" title="插入列">+列</button>
+              <button onClick={tableDeleteCol} className="text-xs text-text-secondary hover:text-urgent px-1.5 py-0.5 hover:bg-urgent/10 rounded" title="删除列">-列</button>
               <div className="w-px h-4 bg-border-custom" />
+              <button onClick={tableDelete} className="text-xs text-text-secondary hover:text-urgent px-1.5 py-0.5 hover:bg-urgent/10 rounded" title="删除表格">删除</button>
               <button onClick={() => setTableToolbar(null)} className="text-text-muted hover:text-text-primary px-1" title="关闭">
                 <X size={12} />
               </button>
@@ -822,15 +814,10 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
                   const FileIcon = getFileIcon(att.fileType);
                   const isImage = att.fileType.startsWith('image/');
                   const isPdf = att.fileType === 'application/pdf';
-
                   return (
                     <div key={att.id} className="flex items-center gap-2 bg-[#1A1F2E] rounded-lg p-2.5 group">
-                      {/* Thumbnail or icon */}
                       {isImage ? (
-                        <button
-                          onClick={() => setPreviewAttachment(att)}
-                          className="w-10 h-10 rounded overflow-hidden flex-shrink-0"
-                        >
+                        <button onClick={() => setPreviewAttachment(att)} className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
                           <img src={att.data} alt={att.fileName} className="w-full h-full object-cover" />
                         </button>
                       ) : (
@@ -838,48 +825,23 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
                           <FileIcon size={18} className={isPdf ? 'text-urgent' : 'text-text-muted'} />
                         </div>
                       )}
-
-                      {/* File info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-xs text-text-primary truncate">{att.fileName}</p>
                         <p className="text-[10px] text-text-muted">{formatFileSize(att.fileSize)}</p>
                       </div>
-
-                      {/* Actions */}
                       <div className="flex items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
                         {(isImage || isPdf) && (
-                          <button
-                            onClick={() => setPreviewAttachment(att)}
-                            className="p-1.5 text-text-muted hover:text-gold transition-colors"
-                            title="预览"
-                          >
+                          <button onClick={() => setPreviewAttachment(att)} className="p-1.5 text-text-muted hover:text-gold transition-colors" title="预览">
                             <Eye size={14} />
                           </button>
                         )}
-                        <button
-                          onClick={() => handleAISummary(att)}
-                          disabled={summarizingId === att.id}
-                          className="p-1.5 text-text-muted hover:text-gold transition-colors"
-                          title="AI 总结"
-                        >
-                          {summarizingId === att.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Sparkles size={14} />
-                          )}
+                        <button onClick={() => handleAISummary(att)} disabled={summarizingId === att.id} className="p-1.5 text-text-muted hover:text-gold transition-colors" title="AI 总结">
+                          {summarizingId === att.id ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                         </button>
-                        <button
-                          onClick={() => handleDownload(att)}
-                          className="p-1.5 text-text-muted hover:text-gold transition-colors"
-                          title="下载"
-                        >
+                        <button onClick={() => handleDownload(att)} className="p-1.5 text-text-muted hover:text-gold transition-colors" title="下载">
                           <Download size={14} />
                         </button>
-                        <button
-                          onClick={() => parentId && removeAttachment(parentId, att.id)}
-                          className="p-1.5 text-text-muted hover:text-urgent transition-colors"
-                          title="删除"
-                        >
+                        <button onClick={() => parentId && removeAttachment(parentId, att.id)} className="p-1.5 text-text-muted hover:text-urgent transition-colors" title="删除">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -887,8 +849,6 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
                   );
                 })}
               </div>
-
-              {/* AI Summary display */}
               {attachments.some((a) => a.summary) && (
                 <div className="px-4 pb-3 space-y-2">
                   {attachments.filter((a) => a.summary).map((att) => (
@@ -898,10 +858,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
                           <Sparkles size={12} />
                           {att.fileName} - AI 总结
                         </span>
-                        <button
-                          onClick={() => parentId && updateAttachmentSummary(parentId, att.id, '')}
-                          className="text-[10px] text-text-muted hover:text-text-primary"
-                        >
+                        <button onClick={() => parentId && updateAttachmentSummary(parentId, att.id, '')} className="text-[10px] text-text-muted hover:text-text-primary">
                           收起
                         </button>
                       </div>
@@ -914,9 +871,9 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
           )}
         </div>
 
-        {/* Footer hint */}
+        {/* Footer */}
         <div className="px-4 py-1.5 border-t border-border-custom text-xs text-text-muted flex justify-between flex-shrink-0">
-          <span>⠿ 拖拽顶部标题栏可移动窗口 | Ctrl+Z撤销 Ctrl+S保存 | 点击表格单元格可增删行列 | Ctrl+V粘贴截图{parentId ? ' | 📎附件' : ''}</span>
+          <span>拖拽顶部标题栏可移动窗口 | 选中文本弹出浮动工具栏 | Ctrl+Z撤销 Ctrl+S保存{parentId ? ' | 支持附件' : ''}</span>
           <span>附件限100MB以内</span>
         </div>
       </div>
@@ -927,21 +884,18 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
           <div className="card p-5 w-full max-w-xs" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
-                <Table size={18} className="text-gold" />
+                <TableIcon size={18} className="text-gold" />
                 插入表格
               </h3>
               <button onClick={() => setShowTablePicker(false)} className="text-text-muted hover:text-text-primary">
                 <X size={18} />
               </button>
             </div>
-
             <div className="flex items-end gap-4 mb-4">
               <div className="flex-1">
                 <label className="block text-xs text-text-secondary mb-1.5">行数</label>
                 <input
-                  type="number"
-                  min="2"
-                  max="20"
+                  type="number" min="2" max="20"
                   value={tableRows}
                   onChange={(e) => setTableRows(Math.max(2, Math.min(20, parseInt(e.target.value) || 2)))}
                   className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-center text-lg text-text-primary focus:outline-none focus:border-gold/50"
@@ -951,23 +905,17 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
               <div className="flex-1">
                 <label className="block text-xs text-text-secondary mb-1.5">列数</label>
                 <input
-                  type="number"
-                  min="2"
-                  max="10"
+                  type="number" min="2" max="10"
                   value={tableCols}
                   onChange={(e) => setTableCols(Math.max(2, Math.min(10, parseInt(e.target.value) || 2)))}
                   className="w-full bg-ink border border-border-custom rounded-lg px-3 py-2.5 text-center text-lg text-text-primary focus:outline-none focus:border-gold/50"
                 />
               </div>
             </div>
-
-            {/* Quick presets */}
             <div className="flex flex-wrap gap-2 mb-4">
               {[
-                { r: 3, c: 3, label: '3×3' },
-                { r: 4, c: 3, label: '4×3' },
-                { r: 5, c: 4, label: '5×4' },
-                { r: 6, c: 5, label: '6×5' },
+                { r: 3, c: 3, label: '3×3' }, { r: 4, c: 3, label: '4×3' },
+                { r: 5, c: 4, label: '5×4' }, { r: 6, c: 5, label: '6×5' },
               ].map((preset) => (
                 <button
                   key={preset.label}
@@ -982,10 +930,45 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
                 </button>
               ))}
             </div>
-
             <button onClick={insertTable} className="btn-gold w-full py-2.5 text-sm">
               插入 {tableRows}×{tableCols} 表格
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Link Dialog */}
+      {linkDialog.open && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50" onClick={() => setLinkDialog({ open: false, url: '' })}>
+          <div className="card p-5 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-text-primary flex items-center gap-2">
+                <Link size={18} className="text-gold" />
+                {linkDialog.url ? '编辑链接' : '插入链接'}
+              </h3>
+              <button onClick={() => setLinkDialog({ open: false, url: '' })} className="text-text-muted hover:text-text-primary">
+                <X size={18} />
+              </button>
+            </div>
+            <input
+              type="url"
+              value={linkDialog.url}
+              onChange={(e) => setLinkDialog({ ...linkDialog, url: e.target.value })}
+              placeholder="输入链接地址..."
+              className="w-full bg-ink border border-border-custom rounded-lg px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-gold/50 mb-3"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') confirmLink(); }}
+            />
+            <div className="flex gap-2">
+              {linkDialog.url && (
+                <button onClick={() => { setLinkDialog({ open: false, url: '' }); editor?.chain().focus().extendMarkRange('link').unsetLink().run(); }} className="flex-1 py-2.5 text-sm border border-border-custom rounded-lg text-text-secondary hover:text-text-primary transition-colors">
+                  移除链接
+                </button>
+              )}
+              <button onClick={confirmLink} className="flex-1 btn-gold py-2.5 text-sm">
+                确认
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1002,27 +985,14 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
             </div>
             <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
               {previewAttachment.fileType.startsWith('image/') ? (
-                <img
-                  src={previewAttachment.data}
-                  alt={previewAttachment.fileName}
-                  className="max-w-full max-h-full object-contain rounded"
-                />
+                <img src={previewAttachment.data} alt={previewAttachment.fileName} className="max-w-full max-h-full object-contain rounded" />
               ) : previewAttachment.fileType === 'application/pdf' ? (
-                <iframe
-                  src={previewAttachment.data}
-                  className="w-full h-full rounded border-0"
-                  title={previewAttachment.fileName}
-                />
+                <iframe src={previewAttachment.data} className="w-full h-full rounded border-0" title={previewAttachment.fileName} />
               ) : (
                 <div className="text-center text-text-muted">
                   <File size={48} className="mx-auto mb-3" />
                   <p>此文件类型不支持在线预览</p>
-                  <button
-                    onClick={() => handleDownload(previewAttachment)}
-                    className="mt-3 btn-gold text-sm px-4 py-1.5"
-                  >
-                    下载文件
-                  </button>
+                  <button onClick={() => handleDownload(previewAttachment)} className="mt-3 btn-gold text-sm px-4 py-1.5">下载文件</button>
                 </div>
               )}
             </div>
