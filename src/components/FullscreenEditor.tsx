@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, Extension } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -32,6 +32,7 @@ import {
   Loader2, Download, XCircle, Mic, GripVertical,
   Check, Heading1, Heading2, Heading3, Heading4,
   RemoveFormatting, Pilcrow,
+  IndentIncrease, IndentDecrease,
 } from 'lucide-react';
 import { useAttachmentStore, generateAttachmentSummary, type Attachment } from '@/store/useAttachmentStore';
 import VoiceInput from '@/components/VoiceInput';
@@ -174,6 +175,53 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
   const [saveHint, setSaveHint] = useState<{ type: 'auto' | 'manual'; at: number } | null>(null);
   const lastSavedHtml = useRef<string>('');
 
+  // --- 自定义缩进扩展 ---
+  const IndentExtension = Extension.create({
+    name: 'indent',
+    addGlobalAttributes() {
+      return [
+        {
+          types: ['paragraph', 'heading', 'blockquote', 'listItem'],
+          attributes: {
+            indent: {
+              default: 0,
+              renderHTML: (attributes) => {
+                const level = attributes.indent;
+                if (!level) return {};
+                return { style: `margin-left: ${level * 24}px` };
+              },
+              parseHTML: (element) => {
+                const style = element.getAttribute('style') || '';
+                const match = style.match(/margin-left:\s*(\d+)px/);
+                return match ? Math.round(parseInt(match[1]) / 24) : 0;
+              },
+            },
+          },
+        },
+      ];
+    },
+    addCommands() {
+      return {
+        indent: () => ({ commands }) => {
+          const { selection } = this.editor.state;
+          const { $from } = selection;
+          const node = $from.node($from.depth);
+          const currentIndent = node.attrs.indent || 0;
+          if (currentIndent >= 4) return false;
+          return commands.updateAttributes(node.type.name, { indent: currentIndent + 1 });
+        },
+        outdent: () => ({ commands }) => {
+          const { selection } = this.editor.state;
+          const { $from } = selection;
+          const node = $from.node($from.depth);
+          const currentIndent = node.attrs.indent || 0;
+          if (currentIndent <= 0) return false;
+          return commands.updateAttributes(node.type.name, { indent: currentIndent - 1 });
+        },
+      };
+    },
+  });
+
   // --- TipTap Editor ---
   const editor = useEditor({
     extensions: [
@@ -194,6 +242,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
         inline: false,
         HTMLAttributes: { class: 'editor-image' },
       }),
+      IndentExtension,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       TaskList,
       TaskItem.configure({ nested: true }),
@@ -317,6 +366,14 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
         if (!selection.empty) {
           editor.commands.setMark('textStyle', { fontSize: `${value}px` });
         }
+        break;
+      }
+      case 'indent': {
+        editor.commands.indent?.();
+        break;
+      }
+      case 'outdent': {
+        editor.commands.outdent?.();
         break;
       }
     }
@@ -500,13 +557,18 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
         { icon: AlignCenter, action: 'alignCenter', title: '居中', isActive: () => editor.isActive({ textAlign: 'center' }) },
         { icon: AlignRight, action: 'alignRight', title: '右对齐', isActive: () => editor.isActive({ textAlign: 'right' }) },
       ],
-      // Group 8: Insert
+      // Group 8: Indent
+      [
+        { icon: IndentDecrease, action: 'outdent', title: '减少缩进' },
+        { icon: IndentIncrease, action: 'indent', title: '增加缩进 (最多4级)' },
+      ],
+      // Group 9: Insert
       [
         { icon: Link, action: 'link', title: '插入链接' },
         { icon: ImageIcon, action: 'image', title: '插入图片' },
         { icon: TableIcon, action: 'table', title: '插入表格' },
       ],
-      // Group 9: Clear
+      // Group 10: Clear
       [
         { icon: RemoveFormatting, action: 'clearFormat', title: '清除格式' },
       ],

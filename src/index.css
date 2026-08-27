@@ -350,11 +350,17 @@
 .tiptap-editor h4[style*="text-align: right"] {
   text-align: right;
 }
+.tiptap-editor *[style*="margin-left"] {
+  transition: margin-left 0.15s ease;
+}
 
 /* ProseSm compatibility (for rendered content outside editor) */
 .prose-sm p {
-  margin-bottom: 0.5em;
+  margin-bottom: 0.6em;
   text-indent: 0;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 .prose-sm p[style*="text-indent"] {
   text-indent: inherit;
@@ -363,24 +369,57 @@
   font-size: 1.25em;
   font-weight: 700;
   margin: 0.8em 0 0.4em;
+  line-height: 1.5;
 }
 .prose-sm h3 {
   font-size: 1.1em;
   font-weight: 600;
   margin: 0.6em 0 0.3em;
+  line-height: 1.5;
 }
 .prose-sm h4 {
   font-size: 1em;
   font-weight: 600;
   margin: 0.5em 0 0.3em;
+  line-height: 1.5;
+}
+
+/* 修复列表样式 - 强制显示原生序号和圆点 */
+.prose-sm > ul > li::before,
+.prose-sm > ol > li::before {
+  display: none !important;
+  content: none !important;
 }
 .prose-sm ul {
-  list-style: disc;
-  padding-left: 1.5em;
-  margin: 0.3em 0;
+  list-style-type: disc !important;
+  padding-left: 1.8em !important;
+  margin: 0.6em 0 !important;
+  list-style-position: outside !important;
+}
+.prose-sm ol {
+  list-style-type: decimal !important;
+  padding-left: 1.8em !important;
+  margin: 0.6em 0 !important;
+  list-style-position: outside !important;
+}
+.prose-sm ul ul {
+  list-style-type: circle !important;
+}
+.prose-sm ul ul ul {
+  list-style-type: square !important;
+}
+.prose-sm ol ol {
+  list-style-type: lower-alpha !important;
+}
+.prose-sm ol ol ol {
+  list-style-type: lower-roman !important;
 }
 .prose-sm li {
-  margin-bottom: 0.2em;
+  margin-bottom: 0.3em;
+  line-height: 1.7;
+}
+.prose-sm li p {
+  margin: 0;
 }
 .prose-sm blockquote {
   border-left: 3px solid #C5A55A;
