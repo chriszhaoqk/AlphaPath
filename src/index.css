@@ -335,6 +335,48 @@
   box-shadow: 0 4px 16px rgba(212, 168, 83, 0.2);
 }
 
+/* 图片缩放拖拽手柄 */
+.image-resize-wrapper {
+  display: inline-block;
+  max-width: 100%;
+  line-height: 0;
+}
+.image-resize-container {
+  display: inline-block !important;
+  position: relative !important;
+  max-width: 100%;
+}
+.image-resize-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #D4A853;
+  border: 2px solid #0F1419;
+  border-radius: 2px;
+  z-index: 10;
+  cursor: nwse-resize;
+}
+.image-resize-handle.se {
+  bottom: -5px;
+  right: -5px;
+  cursor: nwse-resize;
+}
+.image-resize-handle.sw {
+  bottom: -5px;
+  left: -5px;
+  cursor: nesw-resize;
+}
+.image-resize-handle.ne {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+.image-resize-handle.nw {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+
 /* Text alignment */
 .tiptap-editor p[style*="text-align: center"],
 .tiptap-editor h1[style*="text-align: center"],
@@ -482,10 +524,17 @@
   height: auto;
   border-radius: 6px;
   margin: 0.5em 0;
-  cursor: nwse-resize;
+  display: block;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 .prose-sm img[data-selected] {
   outline: 2px solid #D4A853;
+}
+/* 支持图片缩放容器的渲染 */
+.prose-sm .image-resize-wrapper,
+.prose-sm .image-resize-container {
+  display: inline-block;
+  max-width: 100%;
 }
 
 :root {

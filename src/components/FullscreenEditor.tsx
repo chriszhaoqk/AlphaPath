@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useEditor, EditorContent, Extension } from '@tiptap/react';
+import { useEditor, EditorContent, Extension, NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react';
+import type { NodeViewProps } from '@tiptap/react';
 import { BubbleMenu } from '@tiptap/react/menus';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -38,6 +39,94 @@ import { useAttachmentStore, generateAttachmentSummary, type Attachment } from '
 import VoiceInput from '@/components/VoiceInput';
 
 const lowlight = createLowlight(common);
+
+// ============================================================
+// 可缩放图片组件 (ResizableImage)
+// ============================================================
+const ResizableImageComponent = ({ node, updateAttributes, selected, editor }: NodeViewProps) => {
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [width, setWidth] = useState(node.attrs.width || '');
+  const isResizing = useRef(false);
+  const startX = useRef(0);
+  const startWidth = useRef(0);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent, corner: 'se' | 'sw' | 'ne' | 'nw') => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!imgRef.current) return;
+    isResizing.current = true;
+    startX.current = e.clientX;
+    startWidth.current = imgRef.current.offsetWidth;
+
+    const onMove = (ev: MouseEvent) => {
+      if (!isResizing.current) return;
+      const delta = ev.clientX - startX.current;
+      let newWidth: number;
+      if (corner === 'se' || corner === 'ne') {
+        newWidth = Math.max(50, startWidth.current + delta);
+      } else {
+        newWidth = Math.max(50, startWidth.current - delta);
+      }
+      // 限制最大宽度为编辑器容器宽度
+      const maxW = editor.view.dom.offsetWidth - 20;
+      newWidth = Math.min(newWidth, maxW);
+      setWidth(Math.round(newWidth));
+    };
+
+    const onUp = () => {
+      isResizing.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      // 保存最终宽度到节点属性
+      if (imgRef.current) {
+        updateAttributes({ width: imgRef.current.offsetWidth });
+      }
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [editor, updateAttributes]);
+
+  return (
+    <NodeViewWrapper className="image-resize-wrapper" contentEditable={false}>
+      <div className="image-resize-container" style={{ position: 'relative', display: 'inline-block' }}>
+        <img
+          ref={imgRef}
+          src={node.attrs.src}
+          alt={node.attrs.alt || ''}
+          title={node.attrs.title || ''}
+          width={width || undefined}
+          draggable={false}
+          className={`editor-image ${selected ? 'ProseMirror-selectednode' : ''}`}
+          style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+        />
+        {selected && (
+          <>
+            {/* 四角拖拽手柄 */}
+            <div className="image-resize-handle se" onMouseDown={(e) => handleMouseDown(e, 'se')} />
+            <div className="image-resize-handle sw" onMouseDown={(e) => handleMouseDown(e, 'sw')} />
+            <div className="image-resize-handle ne" onMouseDown={(e) => handleMouseDown(e, 'ne')} />
+            <div className="image-resize-handle nw" onMouseDown={(e) => handleMouseDown(e, 'nw')} />
+          </>
+        )}
+      </div>
+    </NodeViewWrapper>
+  );
+};
+
+// 可缩放图片扩展
+const ResizableImage = ImageExtension.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      width: { default: null },
+      height: { default: null },
+    };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageComponent);
+  },
+});
 
 interface FullscreenEditorProps {
   label: string;
@@ -238,7 +327,7 @@ export default function FullscreenEditor({ label, value, onSave, onClose, onAuto
         openOnClick: false,
         HTMLAttributes: { class: 'editor-link' },
       }),
-      ImageExtension.configure({
+      ResizableImage.configure({
         inline: false,
         HTMLAttributes: { class: 'editor-image' },
       }),
