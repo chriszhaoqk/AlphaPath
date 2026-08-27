@@ -356,11 +356,32 @@
 
 /* ProseSm compatibility (for rendered content outside editor) */
 .prose-sm p {
-  margin-bottom: 0.6em;
+  margin: 0.8em 0;
   text-indent: 0;
   line-height: 1.8;
   white-space: pre-wrap;
   word-wrap: break-word;
+  min-height: 1.2em;
+  display: block;
+}
+.prose-sm p:first-child {
+  margin-top: 0;
+}
+.prose-sm p:last-child {
+  margin-bottom: 0;
+}
+/* 确保空段落（空行）也能显示高度 */
+.prose-sm p:empty {
+  min-height: 1.8em;
+  margin: 0.6em 0;
+}
+.prose-sm p:empty::after {
+  content: '\200B';
+  display: inline;
+}
+.prose-sm p:has(br:only-child) {
+  min-height: 1.8em;
+  margin: 0.6em 0;
 }
 .prose-sm p[style*="text-indent"] {
   text-indent: inherit;

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BookHeart,
@@ -17,10 +17,17 @@ import {
   Meh,
   Smile,
   ChevronRight,
+  Lock,
+  Unlock,
+  Eye,
+  EyeOff,
+  AlertCircle,
+  KeyRound,
 } from 'lucide-react';
 import { useDiaryStore, type Diary } from '@/store/useDiaryStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
 import VoiceTextInput from '@/components/VoiceTextInput';
+import { encryptContent, decryptContent } from '@/utils/crypto';
 
 const MOOD_CONFIG: Record<string, { label: string; icon: typeof Smile; color: string }> = {
   happy: { label: '开心', icon: Smile, color: '#10B981' },
@@ -51,6 +58,25 @@ export default function DiaryPage() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [editorContent, setEditorContent] = useState('');
 
+  // Encryption state (form)
+  const [formEncryptEnabled, setFormEncryptEnabled] = useState(false);
+  const [formPassword, setFormPassword] = useState('');
+  const [formPasswordHint, setFormPasswordHint] = useState('');
+  const [formShowPassword, setFormShowPassword] = useState(false);
+  const [formEncrypting, setFormEncrypting] = useState(false);
+
+  // Decryption state (viewing)
+  const [decryptingId, setDecryptingId] = useState<string | null>(null);
+  const [decryptPassword, setDecryptPassword] = useState('');
+  const [decryptError, setDecryptError] = useState('');
+  const [decrypting, setDecrypting] = useState(false);
+  const [decryptedCache, setDecryptedCache] = useState<Record<string, string>>({});
+
+  // Decryption for editing
+  const [editDecryptPassword, setEditDecryptPassword] = useState('');
+  const [editDecryptError, setEditDecryptError] = useState('');
+  const [editDecrypting, setEditDecrypting] = useState(false);
+
   // Form state
   const [formTitle, setFormTitle] = useState('');
   const [formMood, setFormMood] = useState('calm');
@@ -75,6 +101,11 @@ export default function DiaryPage() {
     setFormTags('');
     setFormDate(getLocalDateString());
     setEditorContent('');
+    setFormEncryptEnabled(false);
+    setFormPassword('');
+    setFormPasswordHint('');
+    setEditDecryptPassword('');
+    setEditDecryptError('');
     setShowForm(true);
   };
 
@@ -85,7 +116,13 @@ export default function DiaryPage() {
     setFormWeather(diary.weather || '');
     setFormTags(diary.tags.join(', '));
     setFormDate(diary.date);
+    // 如果已加密，editorContent 暂存密文，需要解密后才能编辑
     setEditorContent(diary.content);
+    setEditDecryptPassword('');
+    setEditDecryptError('');
+    setFormEncryptEnabled(!!diary.isEncrypted);
+    setFormPassword('');
+    setFormPasswordHint(diary.passwordHint || '');
     setShowForm(true);
   };
 
@@ -103,26 +140,79 @@ export default function DiaryPage() {
     setEditorContent(html);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formTitle.trim()) return;
-    const tags = formTags.split(/[,，]/).map((t) => t.trim()).filter(Boolean);
-    const data = {
-      title: formTitle.trim(),
-      content: editorContent,
-      mood: formMood,
-      weather: formWeather || undefined,
-      date: formDate,
-      tags,
-    };
+    if (formEncryptEnabled && !formPassword) return; // 密码必填
 
-    if (editingId) {
-      updateDiary(editingId, data);
-    } else {
-      addDiary(data);
+    setFormEncrypting(true);
+    try {
+      let content = editorContent;
+      if (formEncryptEnabled && formPassword) {
+        content = await encryptContent(editorContent, formPassword);
+      }
+
+      const tags = formTags.split(/[,，]/).map((t) => t.trim()).filter(Boolean);
+      const data: any = {
+        title: formTitle.trim(),
+        content,
+        mood: formMood,
+        weather: formWeather || undefined,
+        date: formDate,
+        tags,
+        isEncrypted: formEncryptEnabled || undefined,
+        passwordHint: formPasswordHint || undefined,
+      };
+
+      if (editingId) {
+        updateDiary(editingId, data);
+      } else {
+        addDiary(data);
+      }
+      setShowForm(false);
+      setEditingId(null);
+    } catch (err) {
+      console.error('保存失败:', err);
+    } finally {
+      setFormEncrypting(false);
     }
-    setShowForm(false);
-    setEditingId(null);
   };
+
+  // 解密查看日记内容
+  const handleDecrypt = useCallback(async (diaryId: string) => {
+    if (!decryptPassword) return;
+    setDecrypting(true);
+    setDecryptError('');
+    try {
+      const diary = diaries.find((d) => d.id === diaryId);
+      if (!diary || !diary.isEncrypted) return;
+      const decrypted = await decryptContent(diary.content, decryptPassword);
+      setDecryptedCache((prev) => ({ ...prev, [diaryId]: decrypted }));
+      setDecryptingId(null);
+      setDecryptPassword('');
+    } catch {
+      setDecryptError('密码错误，无法解密');
+    } finally {
+      setDecrypting(false);
+    }
+  }, [decryptPassword, diaries]);
+
+  // 解密日记内容用于编辑
+  const handleDecryptForEdit = useCallback(async () => {
+    if (!editDecryptPassword || !editingId) return;
+    setEditDecrypting(true);
+    setEditDecryptError('');
+    try {
+      const diary = diaries.find((d) => d.id === editingId);
+      if (!diary || !diary.isEncrypted) return;
+      const decrypted = await decryptContent(diary.content, editDecryptPassword);
+      setEditorContent(decrypted);
+      setEditDecryptPassword('');
+    } catch {
+      setEditDecryptError('密码错误，无法解密');
+    } finally {
+      setEditDecrypting(false);
+    }
+  }, [editDecryptPassword, editingId, diaries]);
 
   const stripHtml = (html: string) => {
     const tmp = document.createElement('div');
@@ -202,6 +292,9 @@ export default function DiaryPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
                             <h4 className="text-sm font-semibold text-text-primary truncate">{diary.title}</h4>
+                            {diary.isEncrypted && (
+                              <Lock size={12} className="text-gold flex-shrink-0" />
+                            )}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-text-muted">
                             <Calendar size={11} />
@@ -224,8 +317,59 @@ export default function DiaryPage() {
                     {/* 展开内容 */}
                     {expandedId === diary.id && (
                       <div className="px-3 md:px-4 pb-3 md:pb-4 space-y-3 border-t border-border-custom pt-3">
-                        {diary.content ? (
-                          <div className="prose-sm text-sm text-text-primary" dangerouslySetInnerHTML={{ __html: diary.content }} />
+                        {diary.isEncrypted && !decryptedCache[diary.id] ? (
+                          <div className="py-4">
+                            <div className="flex flex-col items-center gap-3 text-center mb-4">
+                              <Lock size={32} className="text-gold" />
+                              <p className="text-sm text-text-muted">此日记已加密，请输入密码查看</p>
+                              {diary.passwordHint && (
+                                <p className="text-xs text-text-muted/60">提示：{diary.passwordHint}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 max-w-xs mx-auto">
+                              <div className="relative flex-1">
+                                <input
+                                  type="password"
+                                  value={decryptingId === diary.id ? decryptPassword : ''}
+                                  onChange={(e) => {
+                                    setDecryptingId(diary.id);
+                                    setDecryptPassword(e.target.value);
+                                    setDecryptError('');
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') handleDecrypt(diary.id);
+                                  }}
+                                  placeholder="输入密码..."
+                                  className="w-full bg-[#0D1117] border border-[#2A3040] rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-gold/50 pr-10"
+                                  autoFocus
+                                />
+                                {decryptingId === diary.id && decryptPassword && (
+                                  <button
+                                    onClick={() => { setDecryptPassword(''); setDecryptError(''); }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                )}
+                              </div>
+                              <button
+                                onClick={() => handleDecrypt(diary.id)}
+                                disabled={decrypting || decryptingId !== diary.id || !decryptPassword}
+                                className="btn-gold text-sm px-4 py-2.5 flex items-center gap-1.5 disabled:opacity-50"
+                              >
+                                {decrypting ? <span className="animate-spin">⟳</span> : <Unlock size={14} />}
+                                解密
+                              </button>
+                            </div>
+                            {decryptError && (
+                              <p className="text-xs text-urgent text-center mt-2 flex items-center justify-center gap-1">
+                                <AlertCircle size={12} />
+                                {decryptError}
+                              </p>
+                            )}
+                          </div>
+                        ) : diary.content ? (
+                          <div className="prose-sm text-sm text-text-primary" dangerouslySetInnerHTML={{ __html: decryptedCache[diary.id] || diary.content }} />
                         ) : (
                           <p className="text-xs text-text-muted">暂无内容</p>
                         )}
@@ -355,34 +499,147 @@ export default function DiaryPage() {
                 />
               </div>
 
+              {/* Encryption Toggle */}
+              <div className="border-t border-border-custom pt-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormEncryptEnabled(!formEncryptEnabled);
+                    if (formEncryptEnabled) {
+                      setFormPassword('');
+                      setFormPasswordHint('');
+                    }
+                  }}
+                  className={`flex items-center gap-2 text-sm transition-colors ${
+                    formEncryptEnabled ? 'text-gold' : 'text-text-secondary hover:text-text-primary'
+                  }`}
+                >
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${
+                    formEncryptEnabled ? 'bg-gold' : 'bg-[#2A3040]'
+                  }`}>
+                    <div className={`w-3.5 h-3.5 rounded-full bg-white absolute top-0.5 transition-transform ${
+                    formEncryptEnabled ? 'translate-x-[18px]' : 'translate-x-[2px]'
+                  }`} />
+                  </div>
+                  <span className="flex items-center gap-1.5">
+                    {formEncryptEnabled ? <Lock size={14} /> : <Unlock size={14} />}
+                    {formEncryptEnabled ? '已启用加密' : '启用加密'}
+                  </span>
+                </button>
+                {formEncryptEnabled && (
+                  <div className="mt-3 space-y-3">
+                    <div>
+                      <label className="block text-xs text-text-secondary mb-1.5">加密密码 *</label>
+                      <div className="relative">
+                        <input
+                          type={formShowPassword ? 'text' : 'password'}
+                          value={formPassword}
+                          onChange={(e) => setFormPassword(e.target.value)}
+                          placeholder="设置日记加密密码"
+                          className="w-full bg-[#0D1117] border border-[#2A3040] rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-gold/50 pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setFormShowPassword(!formShowPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary"
+                        >
+                          {formShowPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                      {editingId && (
+                        <p className="text-xs text-warning mt-1 flex items-center gap-1">
+                          <AlertCircle size={11} />
+                          修改密码将重新加密内容
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="block text-xs text-text-secondary mb-1.5">密码提示（可选）</label>
+                      <input
+                        type="text"
+                        value={formPasswordHint}
+                        onChange={(e) => setFormPasswordHint(e.target.value)}
+                        placeholder="例如：我的生日"
+                        className="w-full bg-[#0D1117] border border-[#2A3040] rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-gold/50"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Content */}
               <div>
                 <label className="block text-xs text-text-secondary mb-1.5">内容</label>
-                <div className="relative">
-                  <textarea
-                    value={editorContent ? stripHtml(editorContent) : ''}
-                    onChange={(e) => setEditorContent(e.target.value)}
-                    placeholder="写下今天的故事..."
-                    rows={4}
-                    className="w-full bg-[#0D1117] border border-[#2A3040] rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-gold/50 resize-none leading-relaxed pr-[52px]"
-                  />
-                  <button
-                    onClick={openEditor}
-                    className="absolute right-2 top-2 w-9 h-9 rounded-lg flex items-center justify-center text-text-muted hover:text-gold hover:bg-gold/10 transition-colors"
-                    title="富文本编辑（支持表格、截图、附件）"
-                  >
-                    <Edit3 size={16} />
-                  </button>
-                </div>
+                {editingId && editingId && (() => {
+                  const diary = diaries.find(d => d.id === editingId);
+                  return diary?.isEncrypted && !editorContent.startsWith('<') ? (
+                    <div className="bg-[#0D1117] border border-[#2A3040] rounded-xl p-4">
+                      <div className="flex flex-col items-center gap-2 text-center mb-3">
+                        <Lock size={24} className="text-gold" />
+                        <p className="text-sm text-text-muted">内容已加密，请输入密码解密后编辑</p>
+                        {diary.passwordHint && (
+                          <p className="text-xs text-text-muted/60">提示：{diary.passwordHint}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="password"
+                          value={editDecryptPassword}
+                          onChange={(e) => { setEditDecryptPassword(e.target.value); setEditDecryptError(''); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleDecryptForEdit(); }}
+                          placeholder="输入密码..."
+                          className="flex-1 bg-[#0D1117] border border-[#2A3040] rounded-xl px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-gold/50"
+                          autoFocus
+                        />
+                        <button
+                          onClick={handleDecryptForEdit}
+                          disabled={editDecrypting || !editDecryptPassword}
+                          className="btn-gold text-sm px-4 py-3 disabled:opacity-50"
+                        >
+                          {editDecrypting ? <span className="animate-spin">⟳</span> : '解密'}
+                        </button>
+                      </div>
+                      {editDecryptError && (
+                        <p className="text-xs text-urgent mt-2 flex items-center gap-1">
+                          <AlertCircle size={11} />
+                          {editDecryptError}
+                        </p>
+                      )}
+                    </div>
+                  ) : null;
+                })()}
+                {(!editingId || !diaries.find(d => d.id === editingId)?.isEncrypted || editorContent.startsWith('<')) && (
+                  <div className="relative">
+                    <textarea
+                      value={editorContent ? stripHtml(editorContent) : ''}
+                      onChange={(e) => setEditorContent(e.target.value)}
+                      placeholder="写下今天的故事..."
+                      rows={4}
+                      className="w-full bg-[#0D1117] border border-[#2A3040] rounded-xl px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-gold/50 resize-none leading-relaxed pr-[52px]"
+                    />
+                    <button
+                      onClick={openEditor}
+                      className="absolute right-2 top-2 w-9 h-9 rounded-lg flex items-center justify-center text-text-muted hover:text-gold hover:bg-gold/10 transition-colors"
+                      title="富文本编辑（支持表格、截图、附件）"
+                    >
+                      <Edit3 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
             <button
               onClick={handleSave}
-              disabled={!formTitle.trim()}
+              disabled={!formTitle.trim() || (formEncryptEnabled && !formPassword) || formEncrypting}
               className="btn-gold w-full py-2.5 text-sm mt-4 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              保存日记
+              {formEncrypting ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <span className="animate-spin">⟳</span>
+                  加密中...
+                </span>
+              ) : '保存日记'}
             </button>
           </div>
         </div>,

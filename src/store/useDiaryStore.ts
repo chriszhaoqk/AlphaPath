@@ -11,6 +11,8 @@ export interface Diary {
   tags: string[];
   created_at: string;
   updated_at: string;
+  isEncrypted?: boolean;
+  passwordHint?: string;
 }
 
 const generateId = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
