@@ -13,6 +13,7 @@ import {
   Building2,
   Wallet,
   BookHeart,
+  StickyNote,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/industry', icon: Building2, label: '产业调研' },
   { to: '/funds', icon: Wallet, label: '家庭资金' },
   { to: '/diary', icon: BookHeart, label: '个人日记' },
+  { to: '/memo', icon: StickyNote, label: '备忘录' },
   { to: '/learning', icon: BookOpen, label: '学习追踪' },
   { to: '/journal', icon: PenLine, label: '投资笔记' },
   { to: '/skills', icon: Radar, label: '头部基金面试题' },
