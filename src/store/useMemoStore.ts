@@ -1,12 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type MemoStatus = 'todo' | 'done' | 'pending';
+
 export interface Memo {
   id: string;
   title: string;
   content: string;
   tags: string[];
-  color?: string; // 可选标签颜色
+  color?: string;
+  status: MemoStatus;
   created_at: string;
   updated_at: string;
 }
