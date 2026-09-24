@@ -2,8 +2,6 @@ import { useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus,
-  PenLine,
-  BookOpen,
   CheckCircle2,
   FileText,
   Calendar,
@@ -40,8 +38,6 @@ const moduleCards: ModuleCard[] = [
   { to: '/schedule', icon: Calendar, title: '日程管理', subtitle: '每日安排', tint: 'border-blue-400/20', iconBg: 'bg-blue-500/15', iconColor: 'text-blue-400' },
   { to: '/tasks', icon: CheckCircle2, title: '任务中心', subtitle: '四象限管理', tint: 'border-urgent/20', iconBg: 'bg-urgent/15', iconColor: 'text-urgent' },
   { to: '/industry', icon: Building2, title: '产业调研', subtitle: '纪要管理', tint: 'border-emerald-400/20', iconBg: 'bg-emerald-500/15', iconColor: 'text-emerald-400' },
-  { to: '/learning', icon: BookOpen, title: '学习追踪', subtitle: '知识积累', tint: 'border-purple-400/20', iconBg: 'bg-purple-500/15', iconColor: 'text-purple-400' },
-  { to: '/journal', icon: PenLine, title: '投资笔记', subtitle: '思考记录', tint: 'border-amber-400/20', iconBg: 'bg-amber-500/15', iconColor: 'text-amber-400' },
   { to: '/skills', icon: Radar, title: '头部基金面试题', subtitle: '季度面试', tint: 'border-cyan-400/20', iconBg: 'bg-cyan-500/15', iconColor: 'text-cyan-400' },
 ];
 
@@ -223,20 +219,13 @@ export default function Dashboard() {
           <Plus size={16} className="text-gold" />
           快速操作
         </h2>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             onClick={() => navigate('/tasks')}
             className="btn-gold py-3 px-2 rounded-xl text-sm font-medium flex flex-col items-center gap-1"
           >
             <CheckCircle2 size={18} />
             <span>新建任务</span>
-          </button>
-          <button
-            onClick={() => navigate('/journal')}
-            className="py-3 px-2 rounded-xl border border-border-custom text-text-primary bg-[#1A1F2E] active:bg-[#242938] text-sm font-medium flex flex-col items-center gap-1"
-          >
-            <PenLine size={18} className="text-gold" />
-            <span>写笔记</span>
           </button>
           <button
             onClick={() => navigate('/industry')}

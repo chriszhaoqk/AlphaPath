@@ -63,31 +63,6 @@ export function runMigrations(): void {
       updated_at TEXT NOT NULL
     );
 
-    CREATE TABLE IF NOT EXISTS learnings (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      title TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'book',
-      progress REAL NOT NULL DEFAULT 0,
-      notes TEXT,
-      start_date TEXT,
-      completed_date TEXT,
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS journals (
-      id TEXT PRIMARY KEY,
-      user_id TEXT NOT NULL REFERENCES users(id),
-      date TEXT NOT NULL,
-      market_view TEXT,
-      decisions TEXT,
-      reflections TEXT,
-      mood TEXT NOT NULL DEFAULT 'neutral',
-      created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    );
-
     CREATE TABLE IF NOT EXISTS skill_assessments (
       id TEXT PRIMARY KEY,
       user_id TEXT NOT NULL REFERENCES users(id),
@@ -131,9 +106,6 @@ export function runMigrations(): void {
     CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id);
     CREATE INDEX IF NOT EXISTS idx_tasks_completed ON tasks(user_id, completed);
     CREATE INDEX IF NOT EXISTS idx_tasks_quadrant ON tasks(user_id, quadrant);
-    CREATE INDEX IF NOT EXISTS idx_learnings_user_id ON learnings(user_id);
-    CREATE INDEX IF NOT EXISTS idx_journals_user_id ON journals(user_id);
-    CREATE INDEX IF NOT EXISTS idx_journals_date ON journals(user_id, date);
     CREATE INDEX IF NOT EXISTS idx_skill_assessments_user_id ON skill_assessments(user_id);
     CREATE INDEX IF NOT EXISTS idx_skill_assessments_date ON skill_assessments(user_id, date);
     CREATE INDEX IF NOT EXISTS idx_strategies_user_id ON strategies(user_id);

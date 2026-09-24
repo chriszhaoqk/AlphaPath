@@ -18,15 +18,11 @@ import {
   Keyboard,
   Share2,
   Building2,
-  BookOpen,
-  PenLine,
   BarChart3,
   AlertTriangle,
 } from 'lucide-react';
 import { useTaskStore, type Quadrant, type TagType, type Task, type TaskScope } from '@/store/useTaskStore';
 import { useIndustryStore } from '@/store/useIndustryStore';
-import { useLearningStore } from '@/store/useLearningStore';
-import { useJournalStore } from '@/store/useJournalStore';
 import { useAIStore } from '@/store/useAIStore';
 import FullscreenEditor from '@/components/FullscreenEditor';
 import VoiceTextInput from '@/components/VoiceTextInput';
@@ -163,8 +159,6 @@ function getLiveTimeSpent(task: Task): number {
 export default function Tasks() {
   const { tasks, addTask, updateTask, deleteTask, saveDailySummary, getDailySummary } = useTaskStore();
   const { addResearch } = useIndustryStore();
-  const { addLearning } = useLearningStore();
-  const { addJournal } = useJournalStore();
 
   // Current selected date
   const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
@@ -511,7 +505,7 @@ export default function Tasks() {
   };
 
   // Share task to other modules
-  const handleShare = async (task: Task, target: 'industry' | 'learning' | 'journal') => {
+  const handleShare = async (task: Task, target: 'industry') => {
     const timeStr = task.timeSpent > 0 ? `\n\n⏱ 花费时长：${formatDurationCN(task.timeSpent)}` : '';
     const tagStr = task.tags.length > 0 ? `\n🏷 标签：${task.tags.map(t => TAG_OPTIONS.find(o => o.value === t)?.label || t).join('、')}` : '';
     const descStr = task.description ? `\n\n${task.description}` : '';
@@ -529,25 +523,6 @@ export default function Tasks() {
         tags: task.tags,
       });
       setShareSuccess('已分享至产业调研');
-    } else if (target === 'learning') {
-      await addLearning({
-        title: task.title,
-        type: 'report',
-        progress: task.completed ? 100 : 0,
-        notes: `来自任务：${task.title}${tagStr}${timeStr}${descStr}`,
-        start_date: task.dueDate,
-      });
-      setShareSuccess('已分享至学习追踪');
-    } else if (target === 'journal') {
-      const today = formatDate(new Date());
-      await addJournal({
-        date: today,
-        market_view: '',
-        decisions: `来自任务：${task.title}${tagStr}${timeStr}${descStr}`,
-        reflections: '',
-        mood: 'neutral',
-      });
-      setShareSuccess('已分享至投资笔记');
     }
     setShareTaskId(null);
     setTimeout(() => setShareSuccess(''), 2000);
@@ -1386,32 +1361,6 @@ ${
                   <div>
                     <p className="text-sm font-medium text-text-primary">产业调研</p>
                     <p className="text-xs text-text-muted">创建为调研草稿</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleShare(task, 'learning')}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-purple-500/20 bg-purple-500/5 hover:bg-purple-500/10 transition-colors text-left"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/15 flex items-center justify-center flex-shrink-0">
-                    <BookOpen size={20} className="text-purple-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">学习追踪</p>
-                    <p className="text-xs text-text-muted">创建为学习记录</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleShare(task, 'journal')}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl border border-amber-500/20 bg-amber-500/5 hover:bg-amber-500/10 transition-colors text-left"
-                >
-                  <div className="w-10 h-10 rounded-xl bg-amber-500/15 flex items-center justify-center flex-shrink-0">
-                    <PenLine size={20} className="text-amber-400" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-text-primary">投资笔记</p>
-                    <p className="text-xs text-text-muted">添加到今日日记</p>
                   </div>
                 </button>
               </div>

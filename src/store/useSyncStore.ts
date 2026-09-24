@@ -3,8 +3,6 @@ import { persist } from 'zustand/middleware';
 import { useTaskStore } from './useTaskStore';
 import { useGoalStore } from './useGoalStore';
 import { useIndustryStore } from './useIndustryStore';
-import { useJournalStore } from './useJournalStore';
-import { useLearningStore } from './useLearningStore';
 import { useSkillStore } from './useSkillStore';
 
 interface SyncPayload {
@@ -13,8 +11,6 @@ interface SyncPayload {
   tasks: unknown[];
   goals: unknown[];
   researches: unknown[];
-  journals: unknown[];
-  learnings: unknown[];
   assessments: unknown[];
 }
 
@@ -47,8 +43,6 @@ function collectLocalData(): SyncPayload {
   const taskState = useTaskStore.getState();
   const goalState = useGoalStore.getState();
   const industryState = useIndustryStore.getState();
-  const journalState = useJournalStore.getState();
-  const learningState = useLearningStore.getState();
   const skillState = useSkillStore.getState();
 
   return {
@@ -57,8 +51,6 @@ function collectLocalData(): SyncPayload {
     tasks: [...taskState.tasks],
     goals: [...goalState.goals],
     researches: [...industryState.researches],
-    journals: [...journalState.journals],
-    learnings: [...learningState.learnings],
     assessments: [...skillState.assessments],
   };
 }
@@ -95,15 +87,11 @@ function applyRemoteData(remote: SyncPayload) {
   const mergedTasks = mergeByUpdatedAt(local.tasks as any[], remote.tasks as any[]);
   const mergedGoals = mergeByUpdatedAt(local.goals as any[], remote.goals as any[]);
   const mergedResearches = mergeByUpdatedAt(local.researches as any[], remote.researches as any[]);
-  const mergedJournals = mergeByUpdatedAt(local.journals as any[], remote.journals as any[]);
-  const mergedLearnings = mergeByUpdatedAt(local.learnings as any[], remote.learnings as any[]);
   const mergedAssessments = mergeByUpdatedAt(local.assessments as any[], remote.assessments as any[]);
 
   useTaskStore.setState({ tasks: mergedTasks as any });
   useGoalStore.setState({ goals: mergedGoals as any });
   useIndustryStore.setState({ researches: mergedResearches as any });
-  useJournalStore.setState({ journals: mergedJournals as any });
-  useLearningStore.setState({ learnings: mergedLearnings as any });
   useSkillStore.setState({ assessments: mergedAssessments as any });
 }
 

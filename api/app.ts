@@ -42,8 +42,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 import authRoutes from './routes/auth.js'
 import goalRoutes from './routes/goals.js'
 import taskRoutes from './routes/tasks.js'
-import learningRoutes from './routes/learnings.js'
-import journalRoutes from './routes/journals.js'
 import skillRoutes from './routes/skills.js'
 import strategyRoutes from './routes/strategies.js'
 import syncRoutes from './routes/sync.js'
@@ -64,8 +62,6 @@ app.use(
 app.use('/api/auth', authRoutes)
 app.use('/api/goals', goalRoutes)
 app.use('/api/tasks', taskRoutes)
-app.use('/api/learnings', learningRoutes)
-app.use('/api/journals', journalRoutes)
 app.use('/api/skills', skillRoutes)
 app.use('/api/strategies', strategyRoutes)
 app.use('/api', syncRoutes)

@@ -19,8 +19,6 @@ function getUserData(userId: string) {
   }
 
   const tasks = db.prepare('SELECT * FROM tasks WHERE user_id = ?').all(userId);
-  const learnings = db.prepare('SELECT * FROM learnings WHERE user_id = ?').all(userId);
-  const journals = db.prepare('SELECT * FROM journals WHERE user_id = ?').all(userId);
   const skillAssessments = db.prepare('SELECT * FROM skill_assessments WHERE user_id = ?').all(userId);
   const strategies = db.prepare('SELECT * FROM strategies WHERE user_id = ?').all(userId);
 
@@ -33,8 +31,6 @@ function getUserData(userId: string) {
     okrs,
     key_results: keyResults,
     tasks: parsedTasks,
-    learnings,
-    journals,
     skill_assessments: skillAssessments,
     strategies,
   };
@@ -66,8 +62,6 @@ router.post('/sync', (req: AuthRequest, res: Response): void => {
     db.prepare('DELETE FROM milestones WHERE goal_id IN (SELECT id FROM goals WHERE user_id = ?)').run(userId);
     db.prepare('DELETE FROM goals WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM tasks WHERE user_id = ?').run(userId);
-    db.prepare('DELETE FROM learnings WHERE user_id = ?').run(userId);
-    db.prepare('DELETE FROM journals WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM skill_assessments WHERE user_id = ?').run(userId);
     // Don't delete strategies - they are seeded
 
@@ -109,22 +103,6 @@ router.post('/sync', (req: AuthRequest, res: Response): void => {
       for (const t of data.tasks) {
         const tagsJson = typeof t.tags === 'string' ? t.tags : JSON.stringify(t.tags || []);
         insertTask.run(t.id, userId, t.title, t.description, t.quadrant, tagsJson, t.due_date, t.completed, t.completed_at, t.recurrence, t.created_at, t.updated_at);
-      }
-    }
-
-    // Insert learnings
-    if (Array.isArray(data.learnings)) {
-      const insertLearning = db.prepare('INSERT OR IGNORE INTO learnings (id, user_id, title, type, progress, notes, start_date, completed_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      for (const l of data.learnings) {
-        insertLearning.run(l.id, userId, l.title, l.type, l.progress, l.notes, l.start_date, l.completed_date, l.created_at, l.updated_at);
-      }
-    }
-
-    // Insert journals
-    if (Array.isArray(data.journals)) {
-      const insertJournal = db.prepare('INSERT OR IGNORE INTO journals (id, user_id, date, market_view, decisions, reflections, mood, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      for (const j of data.journals) {
-        insertJournal.run(j.id, userId, j.date, j.market_view, j.decisions, j.reflections, j.mood, j.created_at, j.updated_at);
       }
     }
 
@@ -213,8 +191,6 @@ router.post('/versions/:id/restore', (req: AuthRequest, res: Response): void => 
     db.prepare('DELETE FROM milestones WHERE goal_id IN (SELECT id FROM goals WHERE user_id = ?)').run(userId);
     db.prepare('DELETE FROM goals WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM tasks WHERE user_id = ?').run(userId);
-    db.prepare('DELETE FROM learnings WHERE user_id = ?').run(userId);
-    db.prepare('DELETE FROM journals WHERE user_id = ?').run(userId);
     db.prepare('DELETE FROM skill_assessments WHERE user_id = ?').run(userId);
 
     // Re-insert from snapshot
@@ -240,14 +216,6 @@ router.post('/versions/:id/restore', (req: AuthRequest, res: Response): void => 
         const tagsJson = typeof t.tags === 'string' ? t.tags : JSON.stringify(t.tags || []);
         ins.run(t.id, userId, t.title, t.description, t.quadrant, tagsJson, t.due_date, t.completed, t.completed_at, t.recurrence, t.created_at, t.updated_at);
       }
-    }
-    if (Array.isArray(snapshotData.learnings)) {
-      const ins = db.prepare('INSERT OR IGNORE INTO learnings (id, user_id, title, type, progress, notes, start_date, completed_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      for (const l of snapshotData.learnings) ins.run(l.id, userId, l.title, l.type, l.progress, l.notes, l.start_date, l.completed_date, l.created_at, l.updated_at);
-    }
-    if (Array.isArray(snapshotData.journals)) {
-      const ins = db.prepare('INSERT OR IGNORE INTO journals (id, user_id, date, market_view, decisions, reflections, mood, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
-      for (const j of snapshotData.journals) ins.run(j.id, userId, j.date, j.market_view, j.decisions, j.reflections, j.mood, j.created_at, j.updated_at);
     }
     if (Array.isArray(snapshotData.skill_assessments)) {
       const ins = db.prepare('INSERT OR IGNORE INTO skill_assessments (id, user_id, date, notes, industry_score, stock_score, macro_score, strategy_score, quant_score, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');

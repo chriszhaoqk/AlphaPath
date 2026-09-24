@@ -4,8 +4,6 @@ import { useAuthStore } from '@/store/useAuthStore';
 import Layout from '@/components/Layout';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
-import LearningPage from '@/pages/Learning';
-import JournalPage from '@/pages/Journal';
 import Skills from '@/pages/Skills';
 import Settings from '@/pages/Settings';
 import Tasks from '@/pages/Tasks';
@@ -64,8 +62,6 @@ export default function App() {
           <Route path="/funds" element={<FundsPage />} />
           <Route path="/diary" element={<DiaryPage />} />
           <Route path="/memo" element={<MemoPage />} />
-          <Route path="/learning" element={<LearningPage />} />
-          <Route path="/journal" element={<JournalPage />} />
           <Route path="/skills" element={<Skills />} />
           <Route path="/settings" element={<Settings />} />
         </Route>

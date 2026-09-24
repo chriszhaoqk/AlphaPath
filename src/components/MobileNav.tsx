@@ -4,8 +4,6 @@ import {
   LayoutDashboard,
   Calendar,
   CheckSquare,
-  BookOpen,
-  PenLine,
   Radar,
   Settings,
   X,
@@ -17,7 +15,6 @@ import {
   Home,
   ListTodo,
   BookText,
-  GraduationCap,
   ChevronRight,
   Wallet,
   BookHeart,
@@ -31,8 +28,6 @@ const navItems = [
   { to: '/industry', icon: Building2, label: '产业调研' },
   { to: '/funds', icon: Wallet, label: '家庭资金' },
   { to: '/diary', icon: BookHeart, label: '个人日记' },
-  { to: '/learning', icon: BookOpen, label: '学习追踪' },
-  { to: '/journal', icon: PenLine, label: '投资笔记' },
   { to: '/skills', icon: Radar, label: '基金面试' },
   { to: '/settings', icon: Settings, label: '设置' },
 ];
@@ -41,8 +36,7 @@ const navItems = [
 const bottomTabs = [
   { to: '/', icon: Home, label: '首页' },
   { to: '/tasks', icon: ListTodo, label: '任务' },
-  { to: '/journal', icon: PenLine, label: '笔记' },
-  { to: '/learning', icon: GraduationCap, label: '学习' },
+  { to: '/skills', icon: Radar, label: '面试' },
   { to: '/settings', icon: Settings, label: '设置', isMenu: true },
 ];
 

@@ -3,8 +3,6 @@ import {
   LayoutDashboard,
   Calendar,
   CheckSquare,
-  BookOpen,
-  PenLine,
   Radar,
   Settings,
   LogOut,
@@ -25,8 +23,6 @@ const navItems = [
   { to: '/funds', icon: Wallet, label: '家庭资金' },
   { to: '/diary', icon: BookHeart, label: '个人日记' },
   { to: '/memo', icon: StickyNote, label: '备忘录' },
-  { to: '/learning', icon: BookOpen, label: '学习追踪' },
-  { to: '/journal', icon: PenLine, label: '投资笔记' },
   { to: '/skills', icon: Radar, label: '头部基金面试题' },
   { to: '/settings', icon: Settings, label: '设置' },
 ];
